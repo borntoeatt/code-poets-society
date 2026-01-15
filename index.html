@@ -664,7 +664,6 @@
         <section class="projects" id="projects">
             <h2 class="section-title">Featured Projects</h2>
             <div class="projects-grid" id="projectsGrid">
-                <!-- Projects will be loaded dynamically from Supabase -->
                 <div class="project-card">
                     <div class="project-header">
                         <h3>Verse.js</h3>
@@ -760,24 +759,25 @@
     </footer>
 
     <script>
-        // ⚠️ IMPORTANT: Replace these with your actual Supabase credentials
-        // Get them from: https://supabase.com/dashboard/project/YOUR_PROJECT/settings/api
-        const SUPABASE_URL = 'https://lzczpyfutpyqodfwwenp.supabase.co'; // Replace with your project URL
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6Y3pweWZ1dHB5cW9kZnd3ZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MDQzODAsImV4cCI6MjA4NDA4MDM4MH0.3Gvsj0boPhBV4rGTu0VjfYxaII9QPTjH2PH79U-qlXA'; // Replace with your anon/public key
+        // 🔧 CONFIGURATION - Add your Supabase credentials here
+        const SUPABASE_CONFIG = {
+            url: 'https://lzczpyfutpyqodfwwenp.supabase.co',
+            anonKey: 'YOUR_ANON_KEY_HERE'  // ← REPLACE THIS with your anon/public key
+        };
 
         // Initialize Supabase client
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const sbClient = window.supabase.createClient(
+            SUPABASE_CONFIG.url, 
+            SUPABASE_CONFIG.anonKey
+        );
 
-        // Add smooth scrolling
+        // Smooth scrolling for navigation
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
                 const target = document.querySelector(this.getAttribute('href'));
                 if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             });
         });
@@ -798,34 +798,44 @@
                 return;
             }
 
+            // Check if API key is configured
+            if (SUPABASE_CONFIG.anonKey === 'YOUR_ANON_KEY_HERE') {
+                showMessage('⚠️ Supabase API key not configured. Please add your anon key to the code.', 'error');
+                console.error('Add your Supabase anon key on line 762');
+                return;
+            }
+
             // Disable button and show loading state
             submitBtn.disabled = true;
             submitBtn.textContent = 'Subscribing...';
 
             try {
-                // Insert email into newsletter_subscribers table
-                const { data, error } = await supabase
+                const { data, error } = await sbClient
                     .from('newsletter_subscribers')
-                    .insert([
-                        { email: email }
-                    ]);
+                    .insert([{ email: email }])
+                    .select();
 
                 if (error) {
-                    // Check if email already exists
+                    console.error('Supabase error:', error);
+                    
                     if (error.code === '23505') {
                         showMessage('This email is already subscribed!', 'error');
+                    } else if (error.code === '42501') {
+                        showMessage('Permission denied. Check Row Level Security policies in Supabase.', 'error');
+                    } else if (error.message.includes('relation') && error.message.includes('does not exist')) {
+                        showMessage('Database table not found. Please run the SQL schema in Supabase first.', 'error');
                     } else {
-                        throw error;
+                        showMessage(`Error: ${error.message}`, 'error');
                     }
                 } else {
-                    showMessage('🎉 Success! Check your inbox for a welcome message.', 'success');
+                    console.log('Success! Inserted:', data);
+                    showMessage('🎉 Success! Welcome to Code Poets Society!', 'success');
                     emailInput.value = '';
                 }
             } catch (error) {
-                console.error('Error:', error);
-                showMessage('Something went wrong. Please try again later.', 'error');
+                console.error('Unexpected error:', error);
+                showMessage('Something went wrong. Check the browser console for details.', 'error');
             } finally {
-                // Re-enable button
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Get Started';
             }
@@ -841,32 +851,7 @@
             }, 5000);
         }
 
-        // Load projects from Supabase (optional - for when you add projects)
-        async function loadProjects() {
-            try {
-                const { data: projects, error } = await supabase
-                    .from('projects')
-                    .select(`
-                        *,
-                        profiles (username, avatar_url),
-                        collaborators (count)
-                    `)
-                    .eq('featured', true)
-                    .order('created_at', { ascending: false })
-                    .limit(4);
-
-                if (error) throw error;
-
-                // If you have projects in the database, render them here
-                if (projects && projects.length > 0) {
-                    // renderProjects(projects);
-                }
-            } catch (error) {
-                console.error('Error loading projects:', error);
-            }
-        }
-
-        // Add intersection observer for animations
+        // Animation observer
         const observerOptions = {
             threshold: 0.1,
             rootMargin: '0px 0px -50px 0px'
@@ -888,8 +873,9 @@
             observer.observe(el);
         });
 
-        // Load projects on page load (uncomment when you have projects in DB)
-        // loadProjects();
+        console.log('✅ Code Poets Society loaded');
+        console.log('📡 Supabase URL:', SUPABASE_CONFIG.url);
+        console.log('🔑 API Key configured:', SUPABASE_CONFIG.anonKey !== 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6Y3pweWZ1dHB5cW9kZnd3ZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MDQzODAsImV4cCI6MjA4NDA4MDM4MH0.3Gvsj0boPhBV4rGTu0VjfYxaII9QPTjH2PH79U-qlXA' ? 'Yes' : 'No (Please add it!)');
     </script>
 </body>
 </html>
