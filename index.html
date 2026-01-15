@@ -3,11 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Code Poets Society - Where Code Meets Creativity</title>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=JetBrains+Mono:wght@400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <title>Code Poets Society - Collaborate & Create</title>
     
-    <!-- Supabase JS Client -->
+    <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- React -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=JetBrains+Mono:wght@400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     
     <style>
         :root {
@@ -17,6 +24,27 @@
             --code-green: #4a9d5f;
             --shadow: rgba(0, 0, 0, 0.1);
             --border: #e0e0d8;
+            --error: #e74c3c;
+            --success: #27ae60;
+            --card-bg: #ffffff;
+            --text-secondary: #666666;
+            --input-bg: #ffffff;
+            --hover-bg: rgba(74, 157, 95, 0.05);
+        }
+
+        [data-theme="dark"] {
+            --ink: #e8e8e8;
+            --paper: #1a1a1a;
+            --accent: #ffd700;
+            --code-green: #5fd47a;
+            --shadow: rgba(0, 0, 0, 0.5);
+            --border: #333333;
+            --error: #ff6b6b;
+            --success: #51cf66;
+            --card-bg: #242424;
+            --text-secondary: #aaaaaa;
+            --input-bg: #2d2d2d;
+            --hover-bg: rgba(95, 212, 122, 0.1);
         }
 
         * {
@@ -31,14 +59,22 @@
             color: var(--ink);
             line-height: 1.7;
             overflow-x: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        #root {
+            min-height: 100vh;
         }
 
         /* Header */
-        header {
-            padding: 2rem 5%;
+        .header {
+            padding: 1.5rem 5%;
             border-bottom: 3px solid var(--ink);
             background: var(--paper);
-            position: relative;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
 
         .header-content {
@@ -51,128 +87,112 @@
 
         .logo {
             font-family: 'Playfair Display', serif;
-            font-size: 2rem;
+            font-size: 1.5rem;
             font-weight: 900;
             font-style: italic;
             letter-spacing: -1px;
+            cursor: pointer;
         }
 
         .logo .code {
             color: var(--code-green);
         }
 
-        nav {
+        .nav {
             display: flex;
-            gap: 2.5rem;
+            gap: 2rem;
+            align-items: center;
         }
 
-        nav a {
+        .nav-link {
             color: var(--ink);
             text-decoration: none;
             font-size: 0.9rem;
             font-weight: 600;
-            position: relative;
+            cursor: pointer;
             transition: color 0.3s;
+            background: none;
+            border: none;
+            font-family: 'Space Mono', monospace;
         }
 
-        nav a:hover {
+        .nav-link:hover {
             color: var(--code-green);
         }
 
-        nav a::after {
-            content: '';
-            position: absolute;
-            bottom: -5px;
-            left: 0;
-            width: 0;
-            height: 2px;
-            background: var(--accent);
-            transition: width 0.3s;
+        .nav-link.active {
+            color: var(--code-green);
+            border-bottom: 2px solid var(--accent);
         }
 
-        nav a:hover::after {
-            width: 100%;
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
 
-        /* Hero Section */
-        .hero {
+        .user-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: var(--code-green);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            cursor: pointer;
+            border: 2px solid var(--ink);
+        }
+
+        .theme-toggle {
+            background: none;
+            border: 2px solid var(--ink);
+            color: var(--ink);
+            cursor: pointer;
+            padding: 0.5rem 0.8rem;
+            font-size: 1.2rem;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .theme-toggle:hover {
+            background: var(--code-green);
+            border-color: var(--code-green);
+            color: white;
+            transform: rotate(180deg);
+        }
+
+        /* Main Content */
+        .container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 8rem 5% 6rem;
-            position: relative;
+            padding: 3rem 5%;
         }
 
-        .hero-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4rem;
-            align-items: center;
+        .container-narrow {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 3rem 5%;
         }
 
-        .hero-text h1 {
-            font-family: 'Playfair Display', serif;
-            font-size: 5rem;
-            font-weight: 900;
-            line-height: 1;
-            margin-bottom: 1.5rem;
-            position: relative;
-            animation: fadeInUp 0.8s ease-out;
-        }
-
-        .hero-text h1 .highlight {
-            position: relative;
-            display: inline-block;
-        }
-
-        .hero-text h1 .highlight::after {
-            content: '';
-            position: absolute;
-            bottom: 10px;
-            left: -5px;
-            right: -5px;
-            height: 25px;
-            background: var(--accent);
-            opacity: 0.3;
-            z-index: -1;
-            transform: rotate(-1deg);
-        }
-
-        .hero-text .tagline {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.1rem;
-            color: var(--code-green);
-            margin-bottom: 2rem;
-            opacity: 0;
-            animation: fadeIn 1s ease-out 0.3s forwards;
-        }
-
-        .hero-text p {
-            font-size: 1.1rem;
-            margin-bottom: 3rem;
-            max-width: 600px;
-            opacity: 0;
-            animation: fadeIn 1s ease-out 0.5s forwards;
-        }
-
-        .cta-buttons {
-            display: flex;
-            gap: 1.5rem;
-            opacity: 0;
-            animation: fadeIn 1s ease-out 0.7s forwards;
-        }
-
+        /* Buttons */
         .btn {
-            padding: 1rem 2.5rem;
+            padding: 0.8rem 2rem;
             font-family: 'Space Mono', monospace;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: 700;
             text-decoration: none;
             border: 3px solid var(--ink);
             cursor: pointer;
             transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
             background: transparent;
+            color: var(--ink);
         }
 
         .btn-primary {
@@ -184,7 +204,6 @@
             background: var(--code-green);
             border-color: var(--code-green);
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px var(--shadow);
         }
 
         .btn-secondary {
@@ -195,166 +214,110 @@
         .btn-secondary:hover {
             background: var(--ink);
             color: var(--paper);
-            transform: translateY(-2px);
         }
 
-        .code-block {
-            background: var(--ink);
-            color: #4af626;
-            padding: 2rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.9rem;
-            border: 3px solid var(--ink);
-            position: relative;
-            line-height: 1.8;
-            opacity: 0;
-            animation: slideInRight 1s ease-out 0.4s forwards;
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
         }
 
-        .code-block::before {
-            content: '// Welcome to Code Poets Society';
-            display: block;
-            color: #888;
-            margin-bottom: 1rem;
-        }
-
-        .code-line {
-            display: block;
-            padding-left: 2rem;
-            position: relative;
-        }
-
-        .code-line::before {
-            content: attr(data-line);
-            position: absolute;
-            left: 0;
-            color: #666;
-        }
-
-        .keyword {
-            color: #ff6b9d;
-        }
-
-        .string {
-            color: #ffd93d;
-        }
-
-        .function {
-            color: #6bcfff;
-        }
-
-        /* Features Section */
-        .features {
-            background: var(--ink);
-            color: var(--paper);
-            padding: 6rem 5%;
-        }
-
-        .features-container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .section-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 3.5rem;
-            font-weight: 900;
-            margin-bottom: 4rem;
-            text-align: center;
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 3rem;
-        }
-
-        .feature-card {
-            padding: 2.5rem;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .feature-card:hover {
-            border-color: var(--accent);
-            transform: translateY(-5px);
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .feature-icon {
-            font-size: 3rem;
+        /* Forms */
+        .form-group {
             margin-bottom: 1.5rem;
+        }
+
+        .form-label {
             display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
         }
 
-        .feature-card h3 {
+        .form-input,
+        .form-textarea,
+        .form-select {
+            width: 100%;
+            padding: 0.8rem 1rem;
             font-family: 'Space Mono', monospace;
-            font-size: 1.3rem;
+            font-size: 0.9rem;
+            border: 2px solid var(--border);
+            background: var(--input-bg);
+            color: var(--ink);
+            transition: border-color 0.3s, background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .form-input:focus,
+        .form-textarea:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--code-green);
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .form-error {
+            color: var(--error);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        .form-success {
+            color: var(--success);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Cards */
+        .card {
+            border: 3px solid var(--ink);
+            padding: 2rem;
+            background: var(--card-bg);
+            margin-bottom: 2rem;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        .card-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.8rem;
+            font-weight: 700;
             margin-bottom: 1rem;
-            color: var(--accent);
         }
 
-        .feature-card p {
-            font-size: 0.95rem;
-            line-height: 1.7;
-            opacity: 0.9;
-        }
-
-        /* Projects Section */
-        .projects {
-            padding: 6rem 5%;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
+        /* Projects Grid */
         .projects-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 2.5rem;
-            margin-top: 3rem;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
         }
 
         .project-card {
             border: 3px solid var(--ink);
-            padding: 2rem;
+            padding: 1.5rem;
             position: relative;
             transition: all 0.3s;
             cursor: pointer;
-            background: var(--paper);
-        }
-
-        .project-card::before {
-            content: '';
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            right: -10px;
-            bottom: -10px;
-            border: 3px solid var(--ink);
-            z-index: -1;
-            transition: all 0.3s;
+            background: var(--card-bg);
         }
 
         .project-card:hover {
-            transform: translate(5px, 5px);
-        }
-
-        .project-card:hover::before {
-            top: -5px;
-            left: -5px;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 20px var(--shadow);
         }
 
         .project-header {
             display: flex;
             justify-content: space-between;
             align-items: start;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
         }
 
-        .project-card h3 {
+        .project-title {
             font-family: 'Playfair Display', serif;
-            font-size: 1.8rem;
+            font-size: 1.4rem;
             font-weight: 700;
         }
 
@@ -367,515 +330,1295 @@
             border: 2px solid var(--ink);
         }
 
+        .project-author {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
         .project-desc {
-            font-size: 0.95rem;
-            margin-bottom: 1.5rem;
-            line-height: 1.7;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            line-height: 1.6;
         }
 
         .project-meta {
             display: flex;
-            gap: 2rem;
-            font-size: 0.85rem;
-            color: #666;
+            gap: 1.5rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
             font-family: 'JetBrains Mono', monospace;
         }
 
-        /* CTA Section */
-        .cta-section {
-            background: var(--code-green);
-            color: white;
-            padding: 6rem 5%;
-            text-align: center;
+        .project-links {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 2px solid var(--border);
         }
 
-        .cta-content {
-            max-width: 800px;
-            margin: 0 auto;
+        .project-link {
+            font-size: 0.85rem;
+            color: var(--code-green);
+            text-decoration: none;
+            font-weight: 600;
         }
 
-        .cta-section h2 {
+        .project-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Blog Posts */
+        .blog-post {
+            border: 3px solid var(--ink);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: var(--card-bg);
+        }
+
+        .blog-post:hover {
+            box-shadow: 5px 5px 0 var(--ink);
+            transform: translate(-2px, -2px);
+        }
+
+        .blog-title {
             font-family: 'Playfair Display', serif;
-            font-size: 3.5rem;
-            font-weight: 900;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .blog-meta {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .blog-excerpt {
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
+        /* Forum */
+        .forum-topic {
+            border: 2px solid var(--border);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: var(--card-bg);
+        }
+
+        .forum-topic:hover {
+            border-color: var(--code-green);
+            background: var(--hover-bg);
+        }
+
+        .forum-topic-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .forum-topic-meta {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .forum-reply {
+            border-left: 3px solid var(--code-green);
+            padding: 1rem 1.5rem;
+            margin-bottom: 1rem;
+            background: var(--hover-bg);
+        }
+
+        .forum-reply-author {
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .forum-reply-content {
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        /* Code Playground */
+        .playground {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            height: 600px;
+        }
+
+        .playground-editor {
+            border: 3px solid var(--ink);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .playground-toolbar {
+            background: var(--ink);
+            color: white;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .playground-textarea {
+            flex: 1;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            border: none;
+            resize: none;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+
+        .playground-textarea:focus {
+            outline: none;
+        }
+
+        .playground-preview {
+            border: 3px solid var(--ink);
+            background: var(--card-bg);
+        }
+
+        .playground-preview iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Auth Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: var(--card-bg);
+            border: 3px solid var(--ink);
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            font-weight: 700;
             margin-bottom: 1.5rem;
         }
 
-        .cta-section p {
-            font-size: 1.2rem;
-            margin-bottom: 3rem;
-            opacity: 0.95;
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--ink);
         }
 
-        .email-signup {
-            display: flex;
-            gap: 1rem;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .email-input {
-            flex: 1;
-            padding: 1rem 1.5rem;
-            font-family: 'Space Mono', monospace;
-            font-size: 1rem;
-            border: 3px solid white;
-            background: transparent;
-            color: white;
-        }
-
-        .email-input::placeholder {
-            color: rgba(255, 255, 255, 0.6);
-        }
-
-        .email-input:focus {
-            outline: none;
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        /* Success/Error Messages */
-        .message {
-            margin-top: 1rem;
-            padding: 1rem;
-            border: 2px solid white;
-            font-size: 0.9rem;
-            display: none;
-        }
-
-        .message.success {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: white;
-        }
-
-        .message.error {
-            background: rgba(255, 0, 0, 0.2);
-            border-color: #ff6b6b;
-        }
-
-        /* Footer */
-        footer {
-            background: var(--ink);
-            color: var(--paper);
-            padding: 3rem 5%;
+        /* Loading */
+        .loading {
             text-align: center;
+            padding: 3rem;
+            font-size: 1.1rem;
+            color: var(--text-secondary);
         }
 
-        footer p {
-            font-size: 0.9rem;
-            opacity: 0.8;
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
         }
 
-        /* Loading State */
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        /* Animations */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-            to {
-                opacity: 1;
-            }
-        }
-
-        @keyframes slideInRight {
-            from {
-                opacity: 0;
-                transform: translateX(50px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
         }
 
         /* Responsive */
         @media (max-width: 1024px) {
-            .hero-grid {
+            .playground {
                 grid-template-columns: 1fr;
-                gap: 3rem;
+                height: auto;
             }
 
-            .hero-text h1 {
-                font-size: 4rem;
-            }
-
-            .features-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .projects-grid {
-                grid-template-columns: 1fr;
+            .playground-editor,
+            .playground-preview {
+                height: 400px;
             }
         }
 
         @media (max-width: 768px) {
             .header-content {
                 flex-direction: column;
-                gap: 1.5rem;
+                gap: 1rem;
             }
 
-            nav {
-                gap: 1.5rem;
+            .nav {
+                gap: 1rem;
+                flex-wrap: wrap;
             }
 
-            .hero-text h1 {
-                font-size: 3rem;
+            .projects-grid {
+                grid-template-columns: 1fr;
             }
 
-            .section-title {
-                font-size: 2.5rem;
+            .blog-title {
+                font-size: 1.5rem;
             }
+        }
 
-            .cta-buttons {
-                flex-direction: column;
-            }
+        /* Hero Section */
+        .hero {
+            padding: 4rem 0;
+            text-align: center;
+        }
 
-            .email-signup {
-                flex-direction: column;
-            }
+        .hero-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 4rem;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 1rem;
+        }
+
+        .hero-subtitle {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.2rem;
+            color: var(--code-green);
+            margin-bottom: 2rem;
+        }
+
+        .hero-description {
+            font-size: 1.1rem;
+            max-width: 700px;
+            margin: 0 auto 2rem;
+            line-height: 1.8;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 2rem;
+            border: 2px solid var(--border);
+            background: var(--card-bg);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        .stat-number {
+            font-family: 'Playfair Display', serif;
+            font-size: 3rem;
+            font-weight: 900;
+            color: var(--code-green);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        /* Newsletter Section */
+        .newsletter-section {
+            background: var(--code-green);
+            color: white;
+            padding: 4rem 2rem;
+            margin: 4rem 0;
+            text-align: center;
+            border: 3px solid var(--ink);
+        }
+        
+        .newsletter-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .newsletter-form {
+            display: flex;
+            gap: 1rem;
+            max-width: 600px;
+            margin: 2rem auto 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .newsletter-input {
+            flex: 1;
+            min-width: 250px;
+            padding: 1rem 1.5rem;
+            font-family: 'Space Mono', monospace;
+            border: 3px solid white;
+            background: transparent;
+            color: white;
+            font-size: 1rem;
+        }
+        
+        .newsletter-input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .newsletter-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .newsletter-message {
+            margin-top: 1rem;
+            padding: 1rem;
+            border: 2px solid white;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <header>
-        <div class="header-content">
-            <div class="logo">
-                <span class="code">&lt;code&gt;</span> Poets Society <span class="code">&lt;/code&gt;</span>
-            </div>
-            <nav>
-                <a href="#projects">Projects</a>
-                <a href="#collaborate">Collaborate</a>
-                <a href="#community">Community</a>
-                <a href="#join">Join</a>
-            </nav>
-        </div>
-    </header>
+    <div id="root"></div>
 
-    <main>
-        <section class="hero">
-            <div class="hero-grid">
-                <div class="hero-text">
-                    <h1>
-                        Where Code<br>
-                        Meets <span class="highlight">Poetry</span>
-                    </h1>
-                    <p class="tagline">&gt; A creative collective for coding enthusiasts_</p>
-                    <p>
-                        Join a community where developers craft elegant solutions, share 
-                        innovative projects, and collaborate on code that reads like verse. 
-                        Every function tells a story. Every algorithm is art.
-                    </p>
-                    <div class="cta-buttons">
-                        <a href="#join" class="btn btn-primary">Join the Society</a>
-                        <a href="#projects" class="btn btn-secondary">Explore Projects</a>
-                    </div>
-                </div>
-                <div class="code-block">
-                    <span class="code-line" data-line="1"><span class="keyword">const</span> poet = <span class="keyword">new</span> <span class="function">Developer</span>();</span>
-                    <span class="code-line" data-line="2"></span>
-                    <span class="code-line" data-line="3">poet.<span class="function">create</span>({</span>
-                    <span class="code-line" data-line="4">  inspiration: <span class="string">'collaboration'</span>,</span>
-                    <span class="code-line" data-line="5">  craft: <span class="string">'elegant code'</span>,</span>
-                    <span class="code-line" data-line="6">  share: <span class="keyword">true</span></span>
-                    <span class="code-line" data-line="7">});</span>
-                    <span class="code-line" data-line="8"></span>
-                    <span class="code-line" data-line="9">poet.<span class="function">collaborate</span>(<span class="string">'forever'</span>);</span>
-                </div>
-            </div>
-        </section>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
-        <section class="features" id="collaborate">
-            <div class="features-container">
-                <h2 class="section-title">Why Join Our Society?</h2>
-                <div class="features-grid">
-                    <div class="feature-card">
-                        <span class="feature-icon">📚</span>
-                        <h3>Share Projects</h3>
-                        <p>
-                            Showcase your creative coding projects. From weekend experiments 
-                            to production applications, every project has a story worth sharing 
-                            with fellow code poets.
-                        </p>
-                    </div>
-                    <div class="feature-card">
-                        <span class="feature-icon">🤝</span>
-                        <h3>Collaborate</h3>
-                        <p>
-                            Find collaborators for your next big idea. Work together on 
-                            open source projects, hackathon entries, or ambitious side 
-                            projects that push boundaries.
-                        </p>
-                    </div>
-                    <div class="feature-card">
-                        <span class="feature-icon">💡</span>
-                        <h3>Learn & Grow</h3>
-                        <p>
-                            Review code, exchange techniques, and learn from diverse 
-                            perspectives. Get feedback that helps you write more elegant, 
-                            maintainable, and creative solutions.
-                        </p>
-                    </div>
-                    <div class="feature-card">
-                        <span class="feature-icon">🎨</span>
-                        <h3>Creative Freedom</h3>
-                        <p>
-                            Express yourself through code. Whether you're building games, 
-                            generative art, web experiences, or CLI tools—all forms of 
-                            coding creativity are celebrated here.
-                        </p>
-                    </div>
-                    <div class="feature-card">
-                        <span class="feature-icon">🌍</span>
-                        <h3>Global Community</h3>
-                        <p>
-                            Connect with developers from around the world. Share ideas 
-                            across time zones, cultures, and programming paradigms in a 
-                            welcoming, inclusive environment.
-                        </p>
-                    </div>
-                    <div class="feature-card">
-                        <span class="feature-icon">🚀</span>
-                        <h3>Ship Together</h3>
-                        <p>
-                            Turn ideas into reality. From initial concept to deployment, 
-                            work alongside motivated developers who are as excited about 
-                            building as you are.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="projects" id="projects">
-            <h2 class="section-title">Featured Projects</h2>
-            <div class="projects-grid" id="projectsGrid">
-                <div class="project-card">
-                    <div class="project-header">
-                        <h3>Verse.js</h3>
-                        <span class="project-tag">JavaScript</span>
-                    </div>
-                    <p class="project-desc">
-                        A poetic language for creative coding. Write expressive animations 
-                        and interactive experiences with syntax that feels like verse. 
-                        Currently building v2.0 with better animation controls.
-                    </p>
-                    <div class="project-meta">
-                        <span>👥 12 collaborators</span>
-                        <span>⭐ 847 stars</span>
-                    </div>
-                </div>
-
-                <div class="project-card">
-                    <div class="project-header">
-                        <h3>CodeCanvas</h3>
-                        <span class="project-tag">Python</span>
-                    </div>
-                    <p class="project-desc">
-                        Turn your code into visual art. Generate beautiful diagrams, 
-                        architecture visualizations, and algorithmic art from your codebase. 
-                        Looking for contributors familiar with AST parsing.
-                    </p>
-                    <div class="project-meta">
-                        <span>👥 8 collaborators</span>
-                        <span>⭐ 623 stars</span>
-                    </div>
-                </div>
-
-                <div class="project-card">
-                    <div class="project-header">
-                        <h3>Rhyme Runtime</h3>
-                        <span class="project-tag">Rust</span>
-                    </div>
-                    <p class="project-desc">
-                        A blazingly fast runtime for executing creative code patterns. 
-                        Built for performance without sacrificing expressiveness. Need 
-                        help with documentation and example projects.
-                    </p>
-                    <div class="project-meta">
-                        <span>👥 15 collaborators</span>
-                        <span>⭐ 1.2k stars</span>
-                    </div>
-                </div>
-
-                <div class="project-card">
-                    <div class="project-header">
-                        <h3>Metaphor CLI</h3>
-                        <span class="project-tag">Go</span>
-                    </div>
-                    <p class="project-desc">
-                        Command-line tools that speak in metaphors. A delightful terminal 
-                        experience that makes everyday dev tasks more enjoyable. Open to 
-                        new plugin ideas and contributions.
-                    </p>
-                    <div class="project-meta">
-                        <span>👥 6 collaborators</span>
-                        <span>⭐ 492 stars</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="cta-section" id="join">
-            <div class="cta-content">
-                <h2>Ready to Write Your Next Chapter?</h2>
-                <p>
-                    Join thousands of developers who are redefining what code can be. 
-                    Sign up to start sharing, collaborating, and creating.
-                </p>
-                <form class="email-signup" id="signupForm">
-                    <input 
-                        type="email" 
-                        class="email-input" 
-                        id="emailInput"
-                        placeholder="your@email.com" 
-                        required
-                    >
-                    <button type="submit" class="btn btn-primary" id="submitBtn">
-                        Get Started
-                    </button>
-                </form>
-                <div class="message" id="messageBox"></div>
-            </div>
-        </section>
-    </main>
-
-    <footer>
-        <p>&copy; 2026 Code Poets Society. Crafted with &lt;3 and clean code.</p>
-    </footer>
-
-    <script>
-        // 🔧 CONFIGURATION - Add your Supabase credentials here
+        // 🔧 SUPABASE CONFIGURATION
         const SUPABASE_CONFIG = {
             url: 'https://lzczpyfutpyqodfwwenp.supabase.co',
-            anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6Y3pweWZ1dHB5cW9kZnd3ZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MDQzODAsImV4cCI6MjA4NDA4MDM4MH0.3Gvsj0boPhBV4rGTu0VjfYxaII9QPTjH2PH79U-qlXA'  // ← REPLACE THIS with your anon/public key
+            anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6Y3pweWZ1dHB5cW9kZnd3ZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MDQzODAsImV4cCI6MjA4NDA4MDM4MH0.3Gvsj0boPhBV4rGTu0VjfYxaII9QPTjH2PH79U-qlXA'  // ← REPLACE THIS with your anon key
         };
 
-        // Initialize Supabase client
-        const sbClient = window.supabase.createClient(
-            SUPABASE_CONFIG.url, 
+        // Initialize Supabase
+        const supabase = window.supabase.createClient(
+            SUPABASE_CONFIG.url,
             SUPABASE_CONFIG.anonKey
         );
 
-        // Smooth scrolling for navigation
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            });
-        });
-
-        // Newsletter signup handler
-        const signupForm = document.getElementById('signupForm');
-        const emailInput = document.getElementById('emailInput');
-        const submitBtn = document.getElementById('submitBtn');
-        const messageBox = document.getElementById('messageBox');
-
-        signupForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const email = emailInput.value.trim();
-            
-            if (!email) {
-                showMessage('Please enter a valid email address.', 'error');
-                return;
-            }
-
-            // Check if API key is configured
-            if (SUPABASE_CONFIG.anonKey === 'YOUR_ANON_KEY_HERE') {
-                showMessage('⚠️ Supabase API key not configured. Please add your anon key to the code.', 'error');
-                console.error('Add your Supabase anon key on line 762');
-                return;
-            }
-
-            // Disable button and show loading state
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Subscribing...';
-
-            try {
-                const { data, error } = await sbClient
-                    .from('newsletter_subscribers')
-                    .insert([{ email: email }])
-                    .select();
-
-                if (error) {
-                    console.error('Supabase error:', error);
+        // Storage helper functions with Supabase
+        const storage = {
+            async getProjects() {
+                try {
+                    const { data, error } = await supabase
+                        .from('projects')
+                        .select('*')
+                        .order('created_at', { ascending: false });
                     
-                    if (error.code === '23505') {
-                        showMessage('This email is already subscribed!', 'error');
-                    } else if (error.code === '42501') {
-                        showMessage('Permission denied. Check Row Level Security policies in Supabase.', 'error');
-                    } else if (error.message.includes('relation') && error.message.includes('does not exist')) {
-                        showMessage('Database table not found. Please run the SQL schema in Supabase first.', 'error');
-                    } else {
-                        showMessage(`Error: ${error.message}`, 'error');
+                    if (error) {
+                        console.warn('Supabase projects fetch failed, using fallback');
+                        const result = await window.storage?.get('projects', true);
+                        return result ? JSON.parse(result.value) : [];
                     }
-                } else {
-                    console.log('Success! Inserted:', data);
-                    showMessage('🎉 Success! Welcome to Code Poets Society!', 'success');
-                    emailInput.value = '';
+                    return data || [];
+                } catch {
+                    return [];
                 }
-            } catch (error) {
-                console.error('Unexpected error:', error);
-                showMessage('Something went wrong. Check the browser console for details.', 'error');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Get Started';
-            }
-        });
-
-        function showMessage(text, type) {
-            messageBox.textContent = text;
-            messageBox.className = `message ${type}`;
-            messageBox.style.display = 'block';
+            },
             
-            setTimeout(() => {
-                messageBox.style.display = 'none';
-            }, 5000);
-        }
-
-        // Animation observer
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
+            async saveProject(project) {
+                try {
+                    const { data, error } = await supabase
+                        .from('projects')
+                        .insert([project])
+                        .select();
+                    
+                    if (error) throw error;
+                    return data[0];
+                } catch (error) {
+                    console.error('Failed to save project:', error);
+                    // Fallback to local storage
+                    if (window.storage) {
+                        const projects = await this.getProjects();
+                        projects.unshift(project);
+                        await window.storage.set('projects', JSON.stringify(projects), true);
+                    }
+                    return project;
+                }
+            },
+            
+            async subscribeNewsletter(email) {
+                try {
+                    const { data, error } = await supabase
+                        .from('newsletter_subscribers')
+                        .insert([{ email }])
+                        .select();
+                    
+                    if (error) {
+                        if (error.code === '23505') {
+                            return { success: false, error: 'Email already subscribed!' };
+                        }
+                        throw error;
+                    }
+                    
+                    return { success: true };
+                } catch (error) {
+                    console.error('Newsletter subscription error:', error);
+                    return { success: false, error: error.message };
+                }
+            }
         };
 
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
+        // Auth using Supabase
+        const useAuth = () => {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+            
+            useEffect(() => {
+                // Check for existing session
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                    if (session?.user) {
+                        setCurrentUser({
+                            id: session.user.id,
+                            email: session.user.email,
+                            name: session.user.user_metadata?.name || session.user.email.split('@')[0]
+                        });
+                    }
+                    setLoading(false);
+                });
+
+                // Listen for auth changes
+                const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+                    if (session?.user) {
+                        setCurrentUser({
+                            id: session.user.id,
+                            email: session.user.email,
+                            name: session.user.user_metadata?.name || session.user.email.split('@')[0]
+                        });
+                    } else {
+                        setCurrentUser(null);
+                    }
+                });
+
+                return () => subscription.unsubscribe();
+            }, []);
+            
+            const signup = async (name, email, password) => {
+                try {
+                    const { data, error } = await supabase.auth.signUp({
+                        email,
+                        password,
+                        options: {
+                            data: {
+                                name: name
+                            }
+                        }
+                    });
+                    
+                    if (error) throw error;
+                    
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error: error.message };
                 }
+            };
+            
+            const login = async (email, password) => {
+                try {
+                    const { data, error } = await supabase.auth.signInWithPassword({
+                        email,
+                        password
+                    });
+                    
+                    if (error) throw error;
+                    
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            };
+            
+            const logout = async () => {
+                await supabase.auth.signOut();
+                setCurrentUser(null);
+            };
+            
+            return { currentUser, signup, login, logout, loading };
+        };
+
+        // Auth Modal Component
+        const AuthModal = ({ onClose, onSuccess }) => {
+            const [mode, setMode] = useState('login');
+            const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+            const { login, signup } = useAuth();
+            
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+                setLoading(true);
+                
+                let result;
+                if (mode === 'login') {
+                    result = await login(formData.email, formData.password);
+                } else {
+                    result = await signup(formData.name, formData.email, formData.password);
+                }
+                
+                setLoading(false);
+                
+                if (result.success) {
+                    if (mode === 'signup') {
+                        alert('Check your email to confirm your account!');
+                    }
+                    onSuccess();
+                    onClose();
+                } else {
+                    setError(result.error);
+                }
+            };
+            
+            return (
+                <div className="modal-overlay" onClick={onClose}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <h2 className="modal-title">
+                            {mode === 'login' ? 'Welcome Back' : 'Join the Society'}
+                        </h2>
+                        
+                        <form onSubmit={handleSubmit}>
+                            {mode === 'signup' && (
+                                <div className="form-group">
+                                    <label className="form-label">Name</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={formData.name}
+                                        onChange={e => setFormData({...formData, name: e.target.value})}
+                                        required
+                                    />
+                                </div>
+                            )}
+                            
+                            <div className="form-group">
+                                <label className="form-label">Email</label>
+                                <input
+                                    type="email"
+                                    className="form-input"
+                                    value={formData.email}
+                                    onChange={e => setFormData({...formData, email: e.target.value})}
+                                    required
+                                />
+                            </div>
+                            
+                            <div className="form-group">
+                                <label className="form-label">Password</label>
+                                <input
+                                    type="password"
+                                    className="form-input"
+                                    value={formData.password}
+                                    onChange={e => setFormData({...formData, password: e.target.value})}
+                                    required
+                                    minLength="6"
+                                />
+                            </div>
+                            
+                            {error && <div className="form-error">{error}</div>}
+                            
+                            <button 
+                                type="submit" 
+                                className="btn btn-primary" 
+                                style={{width: '100%', marginTop: '1rem'}}
+                                disabled={loading}
+                            >
+                                {loading ? 'Processing...' : (mode === 'login' ? 'Login' : 'Sign Up')}
+                            </button>
+                        </form>
+                        
+                        <p style={{textAlign: 'center', marginTop: '1.5rem', fontSize: '0.9rem'}}>
+                            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+                            <button 
+                                onClick={() => {
+                                    setMode(mode === 'login' ? 'signup' : 'login');
+                                    setError('');
+                                }}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--code-green)',
+                                    cursor: 'pointer',
+                                    fontWeight: '600',
+                                    textDecoration: 'underline'
+                                }}
+                            >
+                                {mode === 'login' ? 'Sign up' : 'Login'}
+                            </button>
+                        </p>
+                    </div>
+                </div>
+            );
+        };
+
+        // Header Component
+        const Header = ({ currentPage, setCurrentPage, currentUser, logout, setShowAuthModal }) => {
+            const [theme, setTheme] = useState('light');
+            
+            useEffect(() => {
+                const savedTheme = localStorage.getItem('theme') || 'light';
+                setTheme(savedTheme);
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            }, []);
+            
+            const toggleTheme = () => {
+                const newTheme = theme === 'light' ? 'dark' : 'light';
+                setTheme(newTheme);
+                localStorage.setItem('theme', newTheme);
+                document.documentElement.setAttribute('data-theme', newTheme);
+            };
+            
+            return (
+                <header className="header">
+                    <div className="header-content">
+                        <div className="logo" onClick={() => setCurrentPage('home')}>
+                            <span className="code">&lt;code&gt;</span> Poets Society <span className="code">&lt;/code&gt;</span>
+                        </div>
+                        <nav className="nav">
+                            <button 
+                                className={`nav-link ${currentPage === 'home' ? 'active' : ''}`}
+                                onClick={() => setCurrentPage('home')}
+                            >
+                                Home
+                            </button>
+                            <button 
+                                className={`nav-link ${currentPage === 'projects' ? 'active' : ''}`}
+                                onClick={() => setCurrentPage('projects')}
+                            >
+                                Projects
+                            </button>
+                            <button 
+                                className={`nav-link ${currentPage === 'playground' ? 'active' : ''}`}
+                                onClick={() => setCurrentPage('playground')}
+                            >
+                                Playground
+                            </button>
+                            
+                            <button 
+                                className="theme-toggle"
+                                onClick={toggleTheme}
+                                title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                            >
+                                {theme === 'light' ? '🌙' : '☀️'}
+                            </button>
+                            
+                            {currentUser ? (
+                                <div className="user-menu">
+                                    <div className="user-avatar" title={currentUser.name}>
+                                        {currentUser.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <button className="nav-link" onClick={logout}>
+                                        Logout
+                                    </button>
+                                </div>
+                            ) : (
+                                <button className="btn btn-primary btn-small" onClick={() => setShowAuthModal(true)}>
+                                    Login / Sign Up
+                                </button>
+                            )}
+                        </nav>
+                    </div>
+                </header>
+            );
+        };
+
+        // Newsletter Component
+        const NewsletterSection = () => {
+            const [email, setEmail] = useState('');
+            const [message, setMessage] = useState({ text: '', type: '' });
+            const [loading, setLoading] = useState(false);
+            
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setMessage({ text: '', type: '' });
+                
+                const result = await storage.subscribeNewsletter(email);
+                
+                setLoading(false);
+                
+                if (result.success) {
+                    setMessage({ text: '🎉 Success! Welcome to Code Poets Society!', type: 'success' });
+                    setEmail('');
+                } else {
+                    setMessage({ text: result.error, type: 'error' });
+                }
+            };
+            
+            return (
+                <div className="newsletter-section">
+                    <h2 className="newsletter-title">Join Our Community</h2>
+                    <p>Get updates on new projects, blog posts, and coding challenges!</p>
+                    <form className="newsletter-form" onSubmit={handleSubmit}>
+                        <input
+                            type="email"
+                            className="newsletter-input"
+                            placeholder="your@email.com"
+                            value={email}
+                            onChange={e => setEmail(e.target.value)}
+                            required
+                        />
+                        <button 
+                            type="submit" 
+                            className="btn btn-primary"
+                            disabled={loading}
+                        >
+                            {loading ? 'Subscribing...' : 'Subscribe'}
+                        </button>
+                    </form>
+                    {message.text && (
+                        <div className="newsletter-message" style={{ display: 'block', background: message.type === 'success' ? 'rgba(255,255,255,0.2)' : 'rgba(255,0,0,0.2)' }}>
+                            {message.text}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Home Page
+        const HomePage = ({ setCurrentPage, currentUser, setShowAuthModal }) => {
+            const [stats, setStats] = useState({ projects: 0, members: 0, subscribers: 0 });
+            
+            useEffect(() => {
+                const loadStats = async () => {
+                    try {
+                        // Get project count
+                        const { count: projectCount } = await supabase
+                            .from('projects')
+                            .select('*', { count: 'exact', head: true });
+                        
+                        // Get newsletter subscriber count
+                        const { count: subscriberCount } = await supabase
+                            .from('newsletter_subscribers')
+                            .select('*', { count: 'exact', head: true });
+                        
+                        setStats({
+                            projects: projectCount || 0,
+                            members: subscriberCount || 0,
+                            subscribers: subscriberCount || 0
+                        });
+                    } catch (error) {
+                        console.error('Failed to load stats:', error);
+                    }
+                };
+                loadStats();
+            }, []);
+            
+            return (
+                <div className="container">
+                    <div className="hero">
+                        <h1 className="hero-title">
+                            Where Code Meets Poetry
+                        </h1>
+                        <p className="hero-subtitle">&gt; A creative collective for coding enthusiasts_</p>
+                        <p className="hero-description">
+                            Join a community where developers craft elegant solutions, share 
+                            innovative projects, and collaborate on code that reads like verse. 
+                            Every function tells a story. Every algorithm is art.
+                        </p>
+                        <div className="hero-buttons">
+                            {!currentUser && (
+                                <button className="btn btn-primary" onClick={() => setShowAuthModal(true)}>
+                                    Join the Society
+                                </button>
+                            )}
+                            <button className="btn btn-secondary" onClick={() => setCurrentPage('projects')}>
+                                Explore Projects
+                            </button>
+                            <button className="btn btn-secondary" onClick={() => setCurrentPage('playground')}>
+                                Try Playground
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="stats">
+                        <div className="stat-card">
+                            <span className="stat-number">{stats.projects}+</span>
+                            <span className="stat-label">Active Projects</span>
+                        </div>
+                        <div className="stat-card">
+                            <span className="stat-number">{stats.members}+</span>
+                            <span className="stat-label">Community Members</span>
+                        </div>
+                        <div className="stat-card">
+                            <span className="stat-number">{stats.subscribers}+</span>
+                            <span className="stat-label">Newsletter Subscribers</span>
+                        </div>
+                    </div>
+                    
+                    <NewsletterSection />
+                </div>
+            );
+        };
+
+        // Projects Page
+        const ProjectsPage = ({ currentUser, setShowAuthModal }) => {
+            const [projects, setProjects] = useState([]);
+            const [githubProjects, setGithubProjects] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [showSubmitForm, setShowSubmitForm] = useState(false);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [filterLanguage, setFilterLanguage] = useState('all');
+            const [formData, setFormData] = useState({
+                title: '',
+                description: '',
+                tech_stack: '',
+                github_url: '',
+                demo_url: ''
             });
-        }, observerOptions);
+            
+            useEffect(() => {
+                loadProjects();
+            }, []);
+            
+            const loadProjects = async () => {
+                setLoading(true);
+                
+                // Load projects from Supabase
+                try {
+                    const { data, error } = await supabase
+                        .from('projects')
+                        .select('*, profiles(username)')
+                        .order('created_at', { ascending: false });
+                    
+                    if (!error && data) {
+                        setProjects(data);
+                    }
+                } catch (error) {
+                    console.error('Failed to load projects:', error);
+                }
+                
+                // Fetch GitHub projects
+                try {
+                    const topics = ['javascript', 'python', 'rust', 'web-development'];
+                    const randomTopic = topics[Math.floor(Math.random() * topics.length)];
+                    const response = await fetch(`https://api.github.com/search/repositories?q=topic:${randomTopic}+stars:>100&sort=stars&order=desc&per_page=6`);
+                    const data = await response.json();
+                    if (data.items) {
+                        setGithubProjects(data.items);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch GitHub projects:', error);
+                }
+                
+                setLoading(false);
+            };
+            
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!currentUser) {
+                    setShowAuthModal(true);
+                    return;
+                }
+                
+                const newProject = {
+                    title: formData.title,
+                    description: formData.description,
+                    tech_stack: formData.tech_stack.split(',').map(t => t.trim()),
+                    github_url: formData.github_url,
+                    demo_url: formData.demo_url,
+                    author_id: currentUser.id,
+                    slug: formData.title.toLowerCase().replace(/\s+/g, '-'),
+                    status: 'active'
+                };
+                
+                await storage.saveProject(newProject);
+                
+                await loadProjects();
+                setFormData({ title: '', description: '', tech_stack: '', github_url: '', demo_url: '' });
+                setShowSubmitForm(false);
+            };
+            
+            const allProjects = [
+                ...projects.map(p => ({
+                    id: p.id,
+                    title: p.title,
+                    description: p.description,
+                    language: p.tech_stack?.[0] || 'N/A',
+                    githubUrl: p.github_url,
+                    demoUrl: p.demo_url,
+                    author: p.profiles?.username || 'Unknown',
+                    stars: p.stars_count || 0,
+                    isSupabase: true
+                })),
+                ...githubProjects.map(p => ({
+                    id: p.id,
+                    title: p.name,
+                    description: p.description,
+                    language: p.language,
+                    githubUrl: p.html_url,
+                    author: p.owner.login,
+                    stars: p.stargazers_count,
+                    isGithub: true
+                }))
+            ];
+            
+            const filteredProjects = allProjects.filter(p => {
+                const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                    p.description?.toLowerCase().includes(searchQuery.toLowerCase());
+                const matchesLanguage = filterLanguage === 'all' || p.language?.toLowerCase() === filterLanguage.toLowerCase();
+                return matchesSearch && matchesLanguage;
+            });
+            
+            const languages = ['all', ...new Set(filteredProjects.map(p => p.language).filter(Boolean))];
+            
+            return (
+                <div className="container">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                        <h1 className="card-title" style={{ margin: 0 }}>Community Projects</h1>
+                        {currentUser && (
+                            <button 
+                                className="btn btn-primary"
+                                onClick={() => setShowSubmitForm(!showSubmitForm)}
+                            >
+                                {showSubmitForm ? 'Cancel' : '+ Submit Project'}
+                            </button>
+                        )}
+                    </div>
+                    
+                    {showSubmitForm && (
+                        <div className="card">
+                            <h2 className="card-title">Submit Your Project</h2>
+                            <form onSubmit={handleSubmit}>
+                                <div className="form-group">
+                                    <label className="form-label">Project Title</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={formData.title}
+                                        onChange={e => setFormData({...formData, title: e.target.value})}
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label className="form-label">Description</label>
+                                    <textarea
+                                        className="form-textarea"
+                                        value={formData.description}
+                                        onChange={e => setFormData({...formData, description: e.target.value})}
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label className="form-label">Tech Stack (comma-separated)</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="e.g., JavaScript, React, Node.js"
+                                        value={formData.tech_stack}
+                                        onChange={e => setFormData({...formData, tech_stack: e.target.value})}
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label className="form-label">GitHub URL</label>
+                                    <input
+                                        type="url"
+                                        className="form-input"
+                                        placeholder="https://github.com/username/repo"
+                                        value={formData.github_url}
+                                        onChange={e => setFormData({...formData, github_url: e.target.value})}
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label className="form-label">Demo URL (optional)</label>
+                                    <input
+                                        type="url"
+                                        className="form-input"
+                                        placeholder="https://demo.example.com"
+                                        value={formData.demo_url}
+                                        onChange={e => setFormData({...formData, demo_url: e.target.value})}
+                                    />
+                                </div>
+                                
+                                <button type="submit" className="btn btn-primary">Submit Project</button>
+                            </form>
+                        </div>
+                    )}
+                    
+                    <div className="filter-bar">
+                        <div className="search-box">
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="Search projects..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <select 
+                            className="form-select"
+                            value={filterLanguage}
+                            onChange={e => setFilterLanguage(e.target.value)}
+                            style={{ minWidth: '150px' }}
+                        >
+                            {languages.map(lang => (
+                                <option key={lang} value={lang}>
+                                    {lang === 'all' ? 'All Languages' : lang}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    
+                    {loading ? (
+                        <div className="loading">Loading projects...</div>
+                    ) : filteredProjects.length === 0 ? (
+                        <div className="empty-state">
+                            <div className="empty-state-icon">📦</div>
+                            <p>No projects found. Be the first to submit one!</p>
+                        </div>
+                    ) : (
+                        <div className="projects-grid">
+                            {filteredProjects.map(project => (
+                                <div key={project.id} className="project-card">
+                                    <div className="project-header">
+                                        <h3 className="project-title">{project.title}</h3>
+                                        {project.language && (
+                                            <span className="project-tag">{project.language}</span>
+                                        )}
+                                    </div>
+                                    <div className="project-author">
+                                        by {project.author}
+                                        {project.isGithub && <span> • GitHub</span>}
+                                        {project.isSupabase && <span> • Community</span>}
+                                    </div>
+                                    <p className="project-desc">{project.description}</p>
+                                    <div className="project-meta">
+                                        <span>⭐ {project.stars} stars</span>
+                                    </div>
+                                    {(project.githubUrl || project.demoUrl) && (
+                                        <div className="project-links">
+                                            {project.githubUrl && (
+                                                <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="project-link">
+                                                    View on GitHub →
+                                                </a>
+                                            )}
+                                            {project.demoUrl && (
+                                                <a href={project.demoUrl} target="_blank" rel="noopener noreferrer" className="project-link">
+                                                    Live Demo →
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
 
-        document.querySelectorAll('.feature-card, .project-card').forEach(el => {
-            el.style.opacity = '0';
-            el.style.transform = 'translateY(30px)';
-            el.style.transition = 'all 0.6s ease-out';
-            observer.observe(el);
-        });
+        // Playground Page
+        const PlaygroundPage = () => {
+            const [code, setCode] = useState(`<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: 'Space Mono', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 3rem;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 {
+            color: #667eea;
+            margin: 0 0 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Welcome to the Playground!</h1>
+        <p>Edit the code to see changes in real-time.</p>
+        <button onclick="alert('Hello, Code Poet!')">Click Me</button>
+    </div>
+</body>
+</html>`);
+            
+            const [preview, setPreview] = useState('');
+            
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    setPreview(code);
+                }, 500);
+                return () => clearTimeout(timer);
+            }, [code]);
+            
+            const resetCode = () => {
+                setCode(`<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: 'Space Mono', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 3rem;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 {
+            color: #667eea;
+            margin: 0 0 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Welcome to the Playground!</h1>
+        <p>Edit the code to see changes in real-time.</p>
+        <button onclick="alert('Hello, Code Poet!')">Click Me</button>
+    </div>
+</body>
+</html>`);
+            };
+            
+            return (
+                <div className="container">
+                    <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h1 className="card-title" style={{ margin: 0 }}>Code Playground</h1>
+                        <button className="btn btn-secondary btn-small" onClick={resetCode}>
+                            Reset Code
+                        </button>
+                    </div>
+                    
+                    <div className="playground">
+                        <div className="playground-editor">
+                            <div className="playground-toolbar">
+                                <span>HTML Editor</span>
+                                <span>Live Preview →</span>
+                            </div>
+                            <textarea
+                                className="playground-textarea"
+                                value={code}
+                                onChange={e => setCode(e.target.value)}
+                                spellCheck={false}
+                            />
+                        </div>
+                        
+                        <div className="playground-preview">
+                            <iframe srcDoc={preview} title="preview" sandbox="allow-scripts" />
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
-        console.log('✅ Code Poets Society loaded');
-        console.log('📡 Supabase URL:', SUPABASE_CONFIG.url);
-        console.log('🔑 API Key configured:', SUPABASE_CONFIG.anonKey !== 'YOUR_ANON_KEY_HERE' ? 'Yes' : 'No (Please add it!)');
+        // Main App
+        const App = () => {
+            const [currentPage, setCurrentPage] = useState('home');
+            const [showAuthModal, setShowAuthModal] = useState(false);
+            const auth = useAuth();
+            
+            const handleAuthSuccess = () => {
+                // Page will automatically update via auth state listener
+            };
+            
+            if (auth.loading) {
+                return <div className="loading">Loading...</div>;
+            }
+            
+            return (
+                <>
+                    <Header 
+                        currentPage={currentPage}
+                        setCurrentPage={setCurrentPage}
+                        currentUser={auth.currentUser}
+                        logout={auth.logout}
+                        setShowAuthModal={setShowAuthModal}
+                    />
+                    
+                    {currentPage === 'home' && (
+                        <HomePage 
+                            setCurrentPage={setCurrentPage}
+                            currentUser={auth.currentUser}
+                            setShowAuthModal={setShowAuthModal}
+                        />
+                    )}
+                    {currentPage === 'projects' && (
+                        <ProjectsPage 
+                            currentUser={auth.currentUser}
+                            setShowAuthModal={setShowAuthModal}
+                        />
+                    )}
+                    {currentPage === 'playground' && <PlaygroundPage />}
+                    
+                    {showAuthModal && (
+                        <AuthModal 
+                            onClose={() => setShowAuthModal(false)}
+                            onSuccess={handleAuthSuccess}
+                        />
+                    )}
+                </>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 </body>
 </html>
