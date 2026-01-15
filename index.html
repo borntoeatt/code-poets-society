@@ -762,7 +762,7 @@
         // 🔧 CONFIGURATION - Add your Supabase credentials here
         const SUPABASE_CONFIG = {
             url: 'https://lzczpyfutpyqodfwwenp.supabase.co',
-            anonKey: 'YOUR_ANON_KEY_HERE'  // ← REPLACE THIS with your anon/public key
+            anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6Y3pweWZ1dHB5cW9kZnd3ZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MDQzODAsImV4cCI6MjA4NDA4MDM4MH0.3Gvsj0boPhBV4rGTu0VjfYxaII9QPTjH2PH79U-qlXA'  // ← REPLACE THIS with your anon/public key
         };
 
         // Initialize Supabase client
@@ -875,7 +875,7 @@
 
         console.log('✅ Code Poets Society loaded');
         console.log('📡 Supabase URL:', SUPABASE_CONFIG.url);
-        console.log('🔑 API Key configured:', SUPABASE_CONFIG.anonKey !== 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6Y3pweWZ1dHB5cW9kZnd3ZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MDQzODAsImV4cCI6MjA4NDA4MDM4MH0.3Gvsj0boPhBV4rGTu0VjfYxaII9QPTjH2PH79U-qlXA' ? 'Yes' : 'No (Please add it!)');
+        console.log('🔑 API Key configured:', SUPABASE_CONFIG.anonKey !== 'YOUR_ANON_KEY_HERE' ? 'Yes' : 'No (Please add it!)');
     </script>
 </body>
 </html>
