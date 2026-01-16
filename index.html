@@ -1220,10 +1220,12 @@
                 // Load projects from Supabase
                 try {
                     const { data, error } = await supabase
-                        .from('projects')
-                        .select('*, profiles(username)')
-                        .order('created_at', { ascending: false });
-                    
+                         .from('projects')
+                         .select(`
+                         *,
+                         profiles!projects_author_id_fkey(username)
+                         `)
+                         .order('created_at', { ascending: false });
                     if (!error && data) {
                         setProjects(data);
                     }
