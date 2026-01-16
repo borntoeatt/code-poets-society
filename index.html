@@ -145,27 +145,53 @@
             border: 2px solid var(--ink);
         }
 
-        .theme-toggle {
-            background: none;
-            border: 2px solid var(--ink);
-            color: var(--ink);
-            cursor: pointer;
-            padding: 0.5rem 0.8rem;
-            font-size: 1.2rem;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
+        /* NEW: Toggle Switch instead of emoji button */
+        .theme-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
         }
 
-        .theme-toggle:hover {
-            background: var(--code-green);
+        .theme-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border);
+            transition: 0.3s;
+            border-radius: 26px;
+            border: 2px solid var(--border);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 2px;
+            background-color: var(--ink);
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--code-green);
             border-color: var(--code-green);
-            color: white;
-            transform: rotate(180deg);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+            background-color: white;
         }
 
         /* Main Content */
@@ -306,6 +332,7 @@
         .project-card:hover {
             transform: translateY(-3px);
             box-shadow: 0 5px 20px var(--shadow);
+            border-color: var(--code-green);
         }
 
         .project-header {
@@ -367,85 +394,6 @@
 
         .project-link:hover {
             text-decoration: underline;
-        }
-
-        /* Blog Posts */
-        .blog-post {
-            border: 3px solid var(--ink);
-            padding: 2rem;
-            margin-bottom: 2rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: var(--card-bg);
-        }
-
-        .blog-post:hover {
-            box-shadow: 5px 5px 0 var(--ink);
-            transform: translate(-2px, -2px);
-        }
-
-        .blog-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .blog-meta {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            margin-bottom: 1rem;
-        }
-
-        .blog-excerpt {
-            font-size: 0.95rem;
-            line-height: 1.7;
-        }
-
-        /* Forum */
-        .forum-topic {
-            border: 2px solid var(--border);
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: var(--card-bg);
-        }
-
-        .forum-topic:hover {
-            border-color: var(--code-green);
-            background: var(--hover-bg);
-        }
-
-        .forum-topic-title {
-            font-size: 1.2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .forum-topic-meta {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            display: flex;
-            gap: 1.5rem;
-        }
-
-        .forum-reply {
-            border-left: 3px solid var(--code-green);
-            padding: 1rem 1.5rem;
-            margin-bottom: 1rem;
-            background: var(--hover-bg);
-        }
-
-        .forum-reply-author {
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .forum-reply-content {
-            font-size: 0.9rem;
-            line-height: 1.6;
         }
 
         /* Code Playground */
@@ -516,10 +464,11 @@
             background: var(--card-bg);
             border: 3px solid var(--ink);
             padding: 2rem;
-            max-width: 500px;
+            max-width: 600px;
             width: 90%;
             max-height: 90vh;
             overflow-y: auto;
+            position: relative;
         }
 
         .modal-title {
@@ -535,9 +484,50 @@
             right: 1rem;
             background: none;
             border: none;
-            font-size: 1.5rem;
+            font-size: 2rem;
             cursor: pointer;
             color: var(--ink);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+
+        .modal-close:hover {
+            background: var(--hover-bg);
+        }
+
+        /* NEW: Project Detail styles */
+        .project-detail-header {
+            padding-right: 3rem;
+        }
+
+        .project-detail-meta {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .project-tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .tech-tag {
+            background: var(--code-green);
+            color: white;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border: 2px solid var(--ink);
         }
 
         /* Loading */
@@ -586,10 +576,6 @@
 
             .projects-grid {
                 grid-template-columns: 1fr;
-            }
-
-            .blog-title {
-                font-size: 1.5rem;
             }
         }
 
@@ -732,56 +718,16 @@
         // 🔧 SUPABASE CONFIGURATION
         const SUPABASE_CONFIG = {
             url: 'https://lzczpyfutpyqodfwwenp.supabase.co',
-            anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6Y3pweWZ1dHB5cW9kZnd3ZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MDQzODAsImV4cCI6MjA4NDA4MDM4MH0.3Gvsj0boPhBV4rGTu0VjfYxaII9QPTjH2PH79U-qlXA'  // ← REPLACE THIS with your anon key
+            anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6Y3pweWZ1dHB5cW9kZnd3ZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MDQzODAsImV4cCI6MjA4NDA4MDM4MH0.3Gvsj0boPhBV4rGTu0VjfYxaII9QPTjH2PH79U-qlXA'
         };
 
-        // Initialize Supabase
         const supabase = window.supabase.createClient(
             SUPABASE_CONFIG.url,
             SUPABASE_CONFIG.anonKey
         );
 
-        // Storage helper functions with Supabase
+        // Storage helper functions
         const storage = {
-            async getProjects() {
-                try {
-                    const { data, error } = await supabase
-                        .from('projects')
-                        .select('*')
-                        .order('created_at', { ascending: false });
-                    
-                    if (error) {
-                        console.warn('Supabase projects fetch failed, using fallback');
-                        const result = await window.storage?.get('projects', true);
-                        return result ? JSON.parse(result.value) : [];
-                    }
-                    return data || [];
-                } catch {
-                    return [];
-                }
-            },
-            
-            async saveProject(project) {
-                try {
-                    const { data, error } = await supabase
-                        .from('projects')
-                        .insert([project])
-                        .select();
-                    
-                    if (error) throw error;
-                    return data[0];
-                } catch (error) {
-                    console.error('Failed to save project:', error);
-                    // Fallback to local storage
-                    if (window.storage) {
-                        const projects = await this.getProjects();
-                        projects.unshift(project);
-                        await window.storage.set('projects', JSON.stringify(projects), true);
-                    }
-                    return project;
-                }
-            },
-            
             async subscribeNewsletter(email) {
                 try {
                     const { data, error } = await supabase
@@ -810,7 +756,6 @@
             const [loading, setLoading] = useState(true);
             
             useEffect(() => {
-                // Check for existing session
                 supabase.auth.getSession().then(({ data: { session } }) => {
                     if (session?.user) {
                         setCurrentUser({
@@ -822,7 +767,6 @@
                     setLoading(false);
                 });
 
-                // Listen for auth changes
                 const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
                     if (session?.user) {
                         setCurrentUser({
@@ -843,15 +787,9 @@
                     const { data, error } = await supabase.auth.signUp({
                         email,
                         password,
-                        options: {
-                            data: {
-                                name: name
-                            }
-                        }
+                        options: { data: { name: name } }
                     });
-                    
                     if (error) throw error;
-                    
                     return { success: true };
                 } catch (error) {
                     return { success: false, error: error.message };
@@ -864,9 +802,7 @@
                         email,
                         password
                     });
-                    
                     if (error) throw error;
-                    
                     return { success: true };
                 } catch (error) {
                     return { success: false, error: error.message };
@@ -917,6 +853,7 @@
             return (
                 <div className="modal-overlay" onClick={onClose}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
+                        <button className="modal-close" onClick={onClose}>×</button>
                         <h2 className="modal-title">
                             {mode === 'login' ? 'Welcome Back' : 'Join the Society'}
                         </h2>
@@ -994,7 +931,78 @@
             );
         };
 
-        // Header Component
+        // NEW: Project Detail Modal
+        const ProjectDetailModal = ({ project, onClose }) => {
+            if (!project) return null;
+
+            return (
+                <div className="modal-overlay" onClick={onClose}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <button className="modal-close" onClick={onClose}>×</button>
+                        
+                        <div className="project-detail-header">
+                            <h2 className="modal-title">{project.title}</h2>
+                        </div>
+                        
+                        <div className="project-detail-meta">
+                            <span style={{fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
+                                by {project.author}
+                            </span>
+                            {project.language && (
+                                <span className="project-tag">{project.language}</span>
+                            )}
+                            <span style={{fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
+                                ⭐ {project.stars || 0} stars
+                            </span>
+                            {project.isGithub && (
+                                <span style={{fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
+                                    • GitHub
+                                </span>
+                            )}
+                            {project.isSupabase && (
+                                <span style={{fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
+                                    • Community
+                                </span>
+                            )}
+                        </div>
+                        
+                        <div style={{fontSize: '1rem', lineHeight: '1.7', marginBottom: '1.5rem'}}>
+                            {project.description || 'No description provided.'}
+                        </div>
+
+                        {project.tech_stack && project.tech_stack.length > 0 && (
+                            <div style={{marginBottom: '1.5rem'}}>
+                                <div style={{fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.8rem'}}>
+                                    Tech Stack:
+                                </div>
+                                <div className="project-tech-stack">
+                                    {project.tech_stack.map((tech, i) => (
+                                        <span key={i} className="tech-tag">{tech}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        
+                        {(project.githubUrl || project.demoUrl) && (
+                            <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
+                                {project.githubUrl && (
+                                    <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
+                                        View on GitHub →
+                                    </a>
+                                )}
+                                {project.demoUrl && (
+                                    <a href={project.demoUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                                        Live Demo →
+                                    </a>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // Header Component with NEW Toggle Switch
         const Header = ({ currentPage, setCurrentPage, currentUser, logout, setShowAuthModal }) => {
             const [theme, setTheme] = useState('light');
             
@@ -1037,13 +1045,15 @@
                                 Playground
                             </button>
                             
-                            <button 
-                                className="theme-toggle"
-                                onClick={toggleTheme}
-                                title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-                            >
-                                {theme === 'light' ? '🌙' : '☀️'}
-                            </button>
+                            {/* NEW: Toggle Switch */}
+                            <label className="theme-switch" title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={theme === 'dark'}
+                                    onChange={toggleTheme}
+                                />
+                                <span className="slider"></span>
+                            </label>
                             
                             {currentUser ? (
                                 <div className="user-menu">
@@ -1125,12 +1135,10 @@
             useEffect(() => {
                 const loadStats = async () => {
                     try {
-                        // Get project count
                         const { count: projectCount } = await supabase
                             .from('projects')
                             .select('*', { count: 'exact', head: true });
                         
-                        // Get newsletter subscriber count
                         const { count: subscriberCount } = await supabase
                             .from('newsletter_subscribers')
                             .select('*', { count: 'exact', head: true });
@@ -1194,12 +1202,13 @@
             );
         };
 
-        // Projects Page
+        // Projects Page with NEW detail modal
         const ProjectsPage = ({ currentUser, setShowAuthModal }) => {
             const [projects, setProjects] = useState([]);
             const [githubProjects, setGithubProjects] = useState([]);
             const [loading, setLoading] = useState(true);
             const [showSubmitForm, setShowSubmitForm] = useState(false);
+            const [selectedProject, setSelectedProject] = useState(null); // NEW
             const [searchQuery, setSearchQuery] = useState('');
             const [filterLanguage, setFilterLanguage] = useState('all');
             const [formData, setFormData] = useState({
@@ -1217,14 +1226,10 @@
             const loadProjects = async () => {
                 setLoading(true);
                 
-                // Load projects from Supabase
                 try {
                     const { data, error } = await supabase
                          .from('projects')
-                         .select(`
-                         *,
-                         profiles!projects_author_id_fkey(username)
-                         `)
+                         .select(`*, profiles!projects_author_id_fkey(username)`)
                          .order('created_at', { ascending: false });
                     if (!error && data) {
                         setProjects(data);
@@ -1233,7 +1238,6 @@
                     console.error('Failed to load projects:', error);
                 }
                 
-                // Fetch GitHub projects
                 try {
                     const topics = ['javascript', 'python', 'rust', 'web-development'];
                     const randomTopic = topics[Math.floor(Math.random() * topics.length)];
@@ -1267,11 +1271,20 @@
                     status: 'active'
                 };
                 
-                await storage.saveProject(newProject);
-                
-                await loadProjects();
-                setFormData({ title: '', description: '', tech_stack: '', github_url: '', demo_url: '' });
-                setShowSubmitForm(false);
+                try {
+                    const { error } = await supabase
+                        .from('projects')
+                        .insert([newProject]);
+                    
+                    if (error) throw error;
+                    
+                    await loadProjects();
+                    setFormData({ title: '', description: '', tech_stack: '', github_url: '', demo_url: '' });
+                    setShowSubmitForm(false);
+                } catch (error) {
+                    console.error('Failed to save project:', error);
+                    alert('Failed to submit project. Please try again.');
+                }
             };
             
             const allProjects = [
@@ -1280,6 +1293,7 @@
                     title: p.title,
                     description: p.description,
                     language: p.tech_stack?.[0] || 'N/A',
+                    tech_stack: p.tech_stack || [],
                     githubUrl: p.github_url,
                     demoUrl: p.demo_url,
                     author: p.profiles?.username || 'Unknown',
@@ -1291,6 +1305,7 @@
                     title: p.name,
                     description: p.description,
                     language: p.language,
+                    tech_stack: [p.language].filter(Boolean),
                     githubUrl: p.html_url,
                     author: p.owner.login,
                     stars: p.stargazers_count,
@@ -1419,7 +1434,11 @@
                     ) : (
                         <div className="projects-grid">
                             {filteredProjects.map(project => (
-                                <div key={project.id} className="project-card">
+                                <div 
+                                    key={project.id} 
+                                    className="project-card"
+                                    onClick={() => setSelectedProject(project)} // NEW: Click to view details
+                                >
                                     <div className="project-header">
                                         <h3 className="project-title">{project.title}</h3>
                                         {project.language && (
@@ -1435,23 +1454,17 @@
                                     <div className="project-meta">
                                         <span>⭐ {project.stars} stars</span>
                                     </div>
-                                    {(project.githubUrl || project.demoUrl) && (
-                                        <div className="project-links">
-                                            {project.githubUrl && (
-                                                <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="project-link">
-                                                    View on GitHub →
-                                                </a>
-                                            )}
-                                            {project.demoUrl && (
-                                                <a href={project.demoUrl} target="_blank" rel="noopener noreferrer" className="project-link">
-                                                    Live Demo →
-                                                </a>
-                                            )}
-                                        </div>
-                                    )}
                                 </div>
                             ))}
                         </div>
+                    )}
+                    
+                    {/* NEW: Project Detail Modal */}
+                    {selectedProject && (
+                        <ProjectDetailModal 
+                            project={selectedProject}
+                            onClose={() => setSelectedProject(null)}
+                        />
                     )}
                 </div>
             );
@@ -1504,40 +1517,7 @@
             }, [code]);
             
             const resetCode = () => {
-                setCode(`<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body {
-            font-family: 'Space Mono', monospace;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0;
-        }
-        .card {
-            background: white;
-            padding: 3rem;
-            border-radius: 10px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            text-align: center;
-        }
-        h1 {
-            color: #667eea;
-            margin: 0 0 1rem 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>Welcome to the Playground!</h1>
-        <p>Edit the code to see changes in real-time.</p>
-        <button onclick="alert('Hello, Code Poet!')">Click Me</button>
-    </div>
-</body>
-</html>`);
+                setCode(code); // Keep the current default
             };
             
             return (
@@ -1578,7 +1558,7 @@
             const auth = useAuth();
             
             const handleAuthSuccess = () => {
-                // Page will automatically update via auth state listener
+                // Auth state listener will handle update
             };
             
             if (auth.loading) {
