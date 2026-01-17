@@ -1564,7 +1564,6 @@
             if (auth.loading) {
                 return <div className="loading">Loading...</div>;
             }
-            
             return (
                 <>
                     <Header 
@@ -1589,7 +1588,7 @@
                         />
                     )}
                     {currentPage === 'playground' && <PlaygroundPage />}
-                    {/* #testtest */}
+                    
                     {showAuthModal && (
                         <AuthModal 
                             onClose={() => setShowAuthModal(false)}
