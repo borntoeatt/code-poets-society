@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: website
-        image: yourusername/code-poets-society:latest
+        image: borntoeatt/code-poets-society:latest
         ports:
         - containerPort: 80
         resources:
