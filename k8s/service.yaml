@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: code-poets-society
+  namespace: default
+spec:
+  selector:
+    app: code-poets-society
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP

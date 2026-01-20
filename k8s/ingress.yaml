@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: code-poets-society
+  namespace: default
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: codepoetssociety.info
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: code-poets-society
+            port:
+              number: 80
