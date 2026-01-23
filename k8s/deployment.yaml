@@ -4,7 +4,7 @@ metadata:
   name: code-poets-society
   namespace: default
 spec:
-  replicas: 10
+  replicas: 100
   selector:
     matchLabels:
       app: code-poets-society
