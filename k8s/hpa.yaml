@@ -8,8 +8,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: code-poets-society
-  minReplicas: 6 # Minimum number of pods
-  maxReplicas: 10
+  minReplicas: 100 # Minimum number of pods
+  maxReplicas: 1000 # Maximum number of pods!!!
   metrics:
   - type: Resource
     resource:
