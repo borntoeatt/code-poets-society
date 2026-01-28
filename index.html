@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Poets Society - Collaborate & Create</title>
     <!--Favicon-->
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%234a9d5f' width='100' height='100' rx='15'/%3E%3Ctext x='50' y='72' text-anchor='middle' font-size='65' fill='white' font-family='monospace' font-weight='bold'%3E%26lt;/%26gt;%3C/text%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%234a9d5f' width='100' height='100' rx='15'/%3E%3Ctext x='50' y='72' text-anchor='middle' font-size='65' fill='white' font-family='monospace' font-weight='bold'%3E%26lt;/%26gt;%3C/text%3E%3C/svg%3E">
     <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
@@ -708,6 +708,125 @@
             border: 2px solid white;
             display: none;
         }
+        
+        /* Comments Section */
+        .comments-section {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 2px solid var(--border);
+        }
+
+        .comments-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .comments-list {
+            margin-bottom: 1.5rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .comment-item {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: var(--hover-bg);
+            border-left: 3px solid var(--code-green);
+        }
+
+        .comment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .comment-author {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--code-green);
+        }
+
+        .comment-date {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .comment-content {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--ink);
+        }
+
+        .comment-actions {
+            margin-top: 0.5rem;
+        }
+
+        .comment-delete-btn {
+            background: none;
+            border: none;
+            color: var(--error);
+            font-size: 0.8rem;
+            cursor: pointer;
+            padding: 0.2rem 0.5rem;
+            font-family: inherit;
+        }
+
+        .comment-delete-btn:hover {
+            text-decoration: underline;
+        }
+
+        .comment-form {
+            margin-top: 1rem;
+        }
+
+        .comment-textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 0.8rem;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9rem;
+            border: 2px solid var(--border);
+            background: var(--input-bg);
+            color: var(--ink);
+            resize: vertical;
+            margin-bottom: 0.8rem;
+        }
+
+        .comment-textarea:focus {
+            outline: none;
+            border-color: var(--code-green);
+        }
+
+        .comment-form-actions {
+            display: flex;
+            gap: 0.8rem;
+            justify-content: flex-end;
+        }
+
+        .comments-empty {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .comment-login-prompt {
+            text-align: center;
+            padding: 1.5rem;
+            background: var(--hover-bg);
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+
+        .comment-login-prompt button {
+            margin-top: 0.8rem;
+        }
+
     </style>
 </head>
 <body>
@@ -933,12 +1052,120 @@
         };
 
         // NEW: Project Detail Modal
-        const ProjectDetailModal = ({ project, onClose }) => {
+        // Enhanced Project Detail Modal with Comments
+        const ProjectDetailModal = ({ project, onClose, currentUser, setShowAuthModal }) => {
+            const [comments, setComments] = useState([]);
+            const [newComment, setNewComment] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [commentsLoading, setCommentsLoading] = useState(true);
+            
             if (!project) return null;
+
+            // Load comments when modal opens
+            useEffect(() => {
+                if (project.isSupabase && project.id) {
+                    loadComments();
+                } else {
+                    setCommentsLoading(false);
+                }
+            }, [project.id]);
+
+            const loadComments = async () => {
+                try {
+                    const { data, error } = await supabase
+                        .from('comments')
+                        .select(`
+                            *,
+                            profiles!comments_author_id_fkey(username)
+                        `)
+                        .eq('project_id', project.id)
+                        .order('created_at', { ascending: false });
+                    
+                    if (!error && data) {
+                        setComments(data);
+                    }
+                } catch (error) {
+                    console.error('Failed to load comments:', error);
+                } finally {
+                    setCommentsLoading(false);
+                }
+            };
+
+            const handleAddComment = async (e) => {
+                e.preventDefault();
+                
+                if (!currentUser) {
+                    setShowAuthModal(true);
+                    return;
+                }
+
+                if (!newComment.trim()) return;
+
+                setLoading(true);
+
+                try {
+                    const { data, error } = await supabase
+                        .from('comments')
+                        .insert([{
+                            project_id: project.id,
+                            author_id: currentUser.id,
+                            content: newComment.trim()
+                        }])
+                        .select(`
+                            *,
+                            profiles!comments_author_id_fkey(username)
+                        `);
+                    
+                    if (error) throw error;
+
+                    if (data && data[0]) {
+                        setComments([data[0], ...comments]);
+                        setNewComment('');
+                    }
+                } catch (error) {
+                    console.error('Failed to add comment:', error);
+                    alert('Failed to add comment. Please try again.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleDeleteComment = async (commentId) => {
+                if (!confirm('Delete this comment?')) return;
+
+                try {
+                    const { error } = await supabase
+                        .from('comments')
+                        .delete()
+                        .eq('id', commentId);
+                    
+                    if (error) throw error;
+
+                    setComments(comments.filter(c => c.id !== commentId));
+                } catch (error) {
+                    console.error('Failed to delete comment:', error);
+                    alert('Failed to delete comment. Please try again.');
+                }
+            };
+
+            const formatDate = (dateString) => {
+                const date = new Date(dateString);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+
+                if (diffMins < 1) return 'just now';
+                if (diffMins < 60) return `${diffMins}m ago`;
+                if (diffHours < 24) return `${diffHours}h ago`;
+                if (diffDays < 7) return `${diffDays}d ago`;
+                return date.toLocaleDateString();
+            };
 
             return (
                 <div className="modal-overlay" onClick={onClose}>
-                    <div className="modal" onClick={e => e.stopPropagation()}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{maxWidth: '800px'}}>
                         <button className="modal-close" onClick={onClose}>×</button>
                         
                         <div className="project-detail-header">
@@ -985,7 +1212,7 @@
                         )}
                         
                         {(project.githubUrl || project.demoUrl) && (
-                            <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
+                            <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem'}}>
                                 {project.githubUrl && (
                                     <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
                                         View on GitHub →
@@ -995,6 +1222,87 @@
                                     <a href={project.demoUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
                                         Live Demo →
                                     </a>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Comments Section - Only for community projects */}
+                        {project.isSupabase && (
+                            <div className="comments-section">
+                                <div className="comments-title">
+                                    💬 Comments ({comments.length})
+                                </div>
+
+                                {commentsLoading ? (
+                                    <div style={{textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)'}}>
+                                        Loading comments...
+                                    </div>
+                                ) : (
+                                    <>
+                                        {comments.length > 0 ? (
+                                            <div className="comments-list">
+                                                {comments.map(comment => (
+                                                    <div key={comment.id} className="comment-item">
+                                                        <div className="comment-header">
+                                                            <div>
+                                                                <span className="comment-author">
+                                                                    {comment.profiles?.username || 'Anonymous'}
+                                                                </span>
+                                                                <span className="comment-date"> • {formatDate(comment.created_at)}</span>
+                                                            </div>
+                                                            {currentUser && currentUser.id === comment.author_id && (
+                                                                <div className="comment-actions">
+                                                                    <button 
+                                                                        className="comment-delete-btn"
+                                                                        onClick={() => handleDeleteComment(comment.id)}
+                                                                    >
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="comment-content">{comment.content}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="comments-empty">
+                                                No comments yet. Be the first to comment!
+                                            </div>
+                                        )}
+
+                                        {currentUser ? (
+                                            <form className="comment-form" onSubmit={handleAddComment}>
+                                                <textarea
+                                                    className="comment-textarea"
+                                                    placeholder="Add a comment..."
+                                                    value={newComment}
+                                                    onChange={e => setNewComment(e.target.value)}
+                                                    maxLength={1000}
+                                                    required
+                                                />
+                                                <div className="comment-form-actions">
+                                                    <button 
+                                                        type="submit" 
+                                                        className="btn btn-primary btn-small"
+                                                        disabled={loading || !newComment.trim()}
+                                                    >
+                                                        {loading ? 'Posting...' : 'Post Comment'}
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        ) : (
+                                            <div className="comment-login-prompt">
+                                                <p style={{marginBottom: '0.5rem'}}>Sign in to leave a comment</p>
+                                                <button className="btn btn-primary btn-small" onClick={() => {
+                                                    onClose();
+                                                    setShowAuthModal(true);
+                                }}>
+                                                    Sign In
+                                                </button>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         )}
@@ -1465,6 +1773,8 @@
                         <ProjectDetailModal 
                             project={selectedProject}
                             onClose={() => setSelectedProject(null)}
+                            currentUser={currentUser}
+                            setShowAuthModal={setShowAuthModal}
                         />
                     )}
                 </div>
@@ -1552,7 +1862,7 @@
             );
         };
 
-        // Main App MAIN MAIN APP APP
+        // Main App
         const App = () => {
             const [currentPage, setCurrentPage] = useState('home');
             const [showAuthModal, setShowAuthModal] = useState(false);
