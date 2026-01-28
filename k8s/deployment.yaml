@@ -16,6 +16,8 @@ spec:
       containers:
       - name: website
         image: borntoeatt/code-poets-society:latest
+        imagePullPolicy: Always  # this ensures the latest image is pulled on each deployment
+
         ports:
         - containerPort: 80
         resources:
