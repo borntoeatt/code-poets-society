@@ -8,8 +8,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: code-poets-society
-  minReplicas: 3 # Minimum number of pods
-  maxReplicas: 1000 # Maximum number of pods!!!
+  minReplicas: 2  # Maintain at least 2 replicas
+  maxReplicas: 10  # Handle traffic spikes up to 10 replicas
   metrics:
   - type: Resource
     resource:
@@ -17,3 +17,22 @@ spec:
       target:
         type: Utilization
         averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80  # Scale when memory hits 80%
+  behavior:  # Add scaling behavior for smoother scaling
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Wait 5 min before scaling down
+      policies:
+      - type: Percent
+        value: 50  # Scale down max 50% of pods at once
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0  # Scale up immediately
+      policies:
+      - type: Percent
+        value: 100  # Can double pods quickly if needed
+        periodSeconds: 15
