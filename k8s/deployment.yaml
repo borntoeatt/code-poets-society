@@ -4,7 +4,7 @@ metadata:
   name: code-poets-society
   namespace: default
 spec:
-  replicas: 3  # Will be managed by HPA
+  replicas: 1  # Will be managed by HPA
   selector:
     matchLabels:
       app: code-poets-society
