@@ -15,7 +15,8 @@
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=JetBrains+Mono:wght@400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-    
+    <!-- Cloudflare Turnstile -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         :root {
             --ink: #1a1a1a;
@@ -1111,13 +1112,14 @@
                             onChange={e => setEmail(e.target.value)}
                             required
                         />
-                        <button 
-                            type="submit" 
-                            className="btn btn-primary"
-                            disabled={loading}
-                        >
-                            {loading ? 'Subscribing...' : 'Subscribe'}
-                        </button>
+                         {/* Turnstile CAPTCHA */}
+                         <div className="cf-turnstile" 
+                              data-sitekey="0x4AAAAAACypsY1Mva9_Ucx3"
+                              data-callback="onTurnstileSuccess">
+                         </div>
+                         <button type="submit" className="btn btn-primary" disabled={loading}>
+                             {loading ? 'Subscribing...' : 'Subscribe'}
+                         </button>
                     </form>
                     {message.text && (
                         <div className="newsletter-message" style={{ display: 'block', background: message.type === 'success' ? 'rgba(255,255,255,0.2)' : 'rgba(255,0,0,0.2)' }}>
