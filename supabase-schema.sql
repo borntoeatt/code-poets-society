@@ -230,6 +230,89 @@ CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- =============================================
+-- RATE LIMITING TRIGGERS
+-- =============================================
+
+-- Rate limit: Max 5 comments per user per minute
+CREATE OR REPLACE FUNCTION check_comment_rate_limit()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (
+        SELECT COUNT(*)
+        FROM public.comments
+        WHERE author_id = NEW.author_id
+          AND created_at > NOW() - INTERVAL '1 minute'
+    ) >= 5 THEN
+        RAISE EXCEPTION 'Rate limit exceeded: max 5 comments per minute';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER comment_rate_limit
+    BEFORE INSERT ON public.comments
+    FOR EACH ROW EXECUTE FUNCTION check_comment_rate_limit();
+
+-- Rate limit: Max 3 project submissions per user per hour
+CREATE OR REPLACE FUNCTION check_project_rate_limit()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (
+        SELECT COUNT(*)
+        FROM public.projects
+        WHERE author_id = NEW.author_id
+          AND created_at > NOW() - INTERVAL '1 hour'
+    ) >= 3 THEN
+        RAISE EXCEPTION 'Rate limit exceeded: max 3 projects per hour';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER project_rate_limit
+    BEFORE INSERT ON public.projects
+    FOR EACH ROW EXECUTE FUNCTION check_project_rate_limit();
+
+-- Rate limit: Max 3 newsletter signups per minute (prevents bulk spam)
+CREATE OR REPLACE FUNCTION check_newsletter_rate_limit()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (
+        SELECT COUNT(*)
+        FROM public.newsletter_subscribers
+        WHERE subscribed_at > NOW() - INTERVAL '1 minute'
+    ) >= 3 THEN
+        RAISE EXCEPTION 'Rate limit exceeded: please try again in a minute';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER newsletter_rate_limit
+    BEFORE INSERT ON public.newsletter_subscribers
+    FOR EACH ROW EXECUTE FUNCTION check_newsletter_rate_limit();
+
+-- Rate limit: Max 5 stars per user per minute (prevents star-bombing)
+CREATE OR REPLACE FUNCTION check_star_rate_limit()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (
+        SELECT COUNT(*)
+        FROM public.project_stars
+        WHERE user_id = NEW.user_id
+          AND starred_at > NOW() - INTERVAL '1 minute'
+    ) >= 5 THEN
+        RAISE EXCEPTION 'Rate limit exceeded: max 5 stars per minute';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER star_rate_limit
+    BEFORE INSERT ON public.project_stars
+    FOR EACH ROW EXECUTE FUNCTION check_star_rate_limit();
+
 -- Insert some sample tags
 INSERT INTO public.tags (name, slug, description) VALUES
     ('JavaScript', 'javascript', 'JavaScript projects and libraries'),
