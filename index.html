@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Poets Society - Collaborate & Create</title>
+    <meta name="description" content="A collaborative platform for developers and creative coders to discover, showcase, and collaborate on coding projects.">
+    <link rel="canonical" href="https://codepoetssociety.info">
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://codepoetssociety.info">
+    <meta property="og:title" content="Code Poets Society - Collaborate & Create">
+    <meta property="og:description" content="A collaborative platform for developers and creative coders to discover, showcase, and collaborate on coding projects.">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Code Poets Society - Collaborate & Create">
+    <meta name="twitter:description" content="A collaborative platform for developers and creative coders to discover, showcase, and collaborate on coding projects.">
     <!-- Cloudflare Turnstile -->
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <!--Favicon-->
@@ -229,10 +240,16 @@
             color: var(--paper);
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             background: var(--code-green);
             border-color: var(--code-green);
             transform: translateY(-2px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .btn-secondary {
@@ -835,7 +852,43 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
+
+        // Error Boundary - catches uncaught React errors
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false };
+            }
+            static getDerivedStateFromError() {
+                return { hasError: true };
+            }
+            componentDidCatch(error, info) {
+                console.error('React error:', error, info);
+            }
+            render() {
+                if (this.state.hasError) {
+                    return React.createElement('div', {
+                        style: {
+                            display: 'flex', flexDirection: 'column', alignItems: 'center',
+                            justifyContent: 'center', height: '100vh', fontFamily: 'Space Mono, monospace',
+                            color: 'var(--ink)', background: 'var(--paper)', textAlign: 'center', padding: '2rem'
+                        }
+                    },
+                        React.createElement('h1', null, 'Something went wrong'),
+                        React.createElement('p', { style: { marginTop: '1rem', color: 'var(--text-secondary)' } },
+                            'An unexpected error occurred. Please refresh the page.'
+                        ),
+                        React.createElement('button', {
+                            className: 'btn btn-primary',
+                            style: { marginTop: '1.5rem' },
+                            onClick: () => window.location.reload()
+                        }, 'Refresh Page')
+                    );
+                }
+                return this.props.children;
+            }
+        }
 
         // 🔧 SUPABASE CONFIGURATION
         const SUPABASE_CONFIG = {
@@ -1392,11 +1445,42 @@
             const [message, setMessage] = useState({ text: '', type: '' });
             const [loading, setLoading] = useState(false);
             const [turnstileToken, setTurnstileToken] = useState('');
-            
-            // Turnstile callback - called when user completes challenge
+            const turnstileRef = useRef(null);
+            const widgetIdRef = useRef(null);
+
+            // Explicitly render Turnstile widget
             useEffect(() => {
-                window.onTurnstileSuccess = (token) => {
-                    setTurnstileToken(token);
+                const renderWidget = () => {
+                    if (window.turnstile && turnstileRef.current && widgetIdRef.current === null) {
+                        const theme = document.documentElement.getAttribute('data-theme') || 'light';
+                        widgetIdRef.current = window.turnstile.render(turnstileRef.current, {
+                            sitekey: '0x4AAAAAACypsY1Mva9_Ucx3',
+                            theme: theme,
+                            callback: (token) => setTurnstileToken(token),
+                            'expired-callback': () => setTurnstileToken(''),
+                            'error-callback': () => setTurnstileToken('')
+                        });
+                    }
+                };
+
+                // Turnstile script may load after component mounts
+                if (window.turnstile) {
+                    renderWidget();
+                } else {
+                    const interval = setInterval(() => {
+                        if (window.turnstile) {
+                            clearInterval(interval);
+                            renderWidget();
+                        }
+                    }, 200);
+                    return () => clearInterval(interval);
+                }
+
+                return () => {
+                    if (widgetIdRef.current !== null && window.turnstile) {
+                        window.turnstile.remove(widgetIdRef.current);
+                        widgetIdRef.current = null;
+                    }
                 };
             }, []);
             
@@ -1435,14 +1519,14 @@
                         setEmail('');
                         setTurnstileToken('');
                         // Reset Turnstile widget
-                        if (window.turnstile) {
-                            window.turnstile.reset();
+                        if (window.turnstile && widgetIdRef.current !== null) {
+                            window.turnstile.reset(widgetIdRef.current);
                         }
                     } else {
                         setMessage({ text: data.error || 'Subscription failed', type: 'error' });
                         // Reset Turnstile on error
-                        if (window.turnstile) {
-                            window.turnstile.reset();
+                        if (window.turnstile && widgetIdRef.current !== null) {
+                            window.turnstile.reset(widgetIdRef.current);
                         }
                         setTurnstileToken('');
                     }
@@ -1468,13 +1552,8 @@
                             required
                         />
                         
-                        {/* Turnstile CAPTCHA */}
-                        <div 
-                            className="cf-turnstile" 
-                            data-sitekey="0x4AAAAAACypsY1Mva9_Ucx3"
-                            data-callback="onTurnstileSuccess"
-                            data-theme="light"
-                        ></div>
+                        {/* Turnstile CAPTCHA - rendered explicitly via useEffect */}
+                        <div ref={turnstileRef} style={{margin: '0.5rem 0'}}></div>
                         
                         <button 
                             type="submit" 
@@ -1969,7 +2048,7 @@
             );
         };
 
-        ReactDOM.render(<App />, document.getElementById('root'));
+        ReactDOM.render(<ErrorBoundary><App /></ErrorBoundary>, document.getElementById('root'));
     </script>
 </body>
 </html>
