@@ -3,8 +3,16 @@ kind: Ingress
 metadata:
   name: code-poets-society
   namespace: default
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik
+  tls:
+  - hosts:
+    - codepoetssociety.info
+    secretName: code-poets-tls
   rules:
   - host: codepoetssociety.info
     http:
