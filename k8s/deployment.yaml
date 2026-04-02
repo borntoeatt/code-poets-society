@@ -31,7 +31,8 @@ spec:
           readOnlyRootFilesystem: false
           capabilities:
             drop:
-              - ALL
+              - NET_RAW
+              - SYS_ADMIN
         livenessProbe:
           httpGet:
             path: /
