@@ -986,8 +986,20 @@
                 await supabase.auth.signOut();
                 setCurrentUser(null);
             };
-            
-            return { currentUser, signup, login, logout, loading };
+
+            const resetPassword = async (email) => {
+                try {
+                    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                        redirectTo: `${window.location.origin}`
+                    });
+                    if (error) throw error;
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            };
+
+            return { currentUser, signup, login, logout, resetPassword, loading };
         };
 
         // Auth Modal Component
@@ -997,16 +1009,73 @@
             const [error, setError] = useState('');
             const [successMsg, setSuccessMsg] = useState('');
             const [loading, setLoading] = useState(false);
-            const { login, signup } = useAuth();
+            const [authTurnstileToken, setAuthTurnstileToken] = useState('');
+            const authTurnstileRef = useRef(null);
+            const authWidgetIdRef = useRef(null);
+            const { login, signup, resetPassword } = useAuth();
+
+            // Render Turnstile widget for signup
+            useEffect(() => {
+                if (mode !== 'signup') {
+                    // Remove widget when switching to login
+                    if (authWidgetIdRef.current !== null && window.turnstile) {
+                        window.turnstile.remove(authWidgetIdRef.current);
+                        authWidgetIdRef.current = null;
+                    }
+                    setAuthTurnstileToken('');
+                    return;
+                }
+                const renderWidget = () => {
+                    if (window.turnstile && authTurnstileRef.current && authWidgetIdRef.current === null) {
+                        const theme = document.documentElement.getAttribute('data-theme') || 'light';
+                        authWidgetIdRef.current = window.turnstile.render(authTurnstileRef.current, {
+                            sitekey: '0x4AAAAAACypsY1Mva9_Ucx3',
+                            theme: theme,
+                            callback: (token) => setAuthTurnstileToken(token),
+                            'expired-callback': () => setAuthTurnstileToken(''),
+                            'error-callback': () => setAuthTurnstileToken('')
+                        });
+                    }
+                };
+                if (window.turnstile) {
+                    renderWidget();
+                } else {
+                    const interval = setInterval(() => {
+                        if (window.turnstile) { clearInterval(interval); renderWidget(); }
+                    }, 200);
+                    return () => clearInterval(interval);
+                }
+                return () => {
+                    if (authWidgetIdRef.current !== null && window.turnstile) {
+                        window.turnstile.remove(authWidgetIdRef.current);
+                        authWidgetIdRef.current = null;
+                    }
+                };
+            }, [mode]);
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 setError('');
                 setSuccessMsg('');
+
+                if (mode === 'signup' && !authTurnstileToken) {
+                    setError('Please complete the CAPTCHA verification');
+                    return;
+                }
+
                 setLoading(true);
 
                 let result;
-                if (mode === 'login') {
+                if (mode === 'reset') {
+                    result = await resetPassword(formData.email);
+                    setLoading(false);
+                    if (result.success) {
+                        setSuccessMsg('Password reset link sent! Check your email.');
+                    } else {
+                        setError(result.error);
+                    }
+                    return;
+                } else if (mode === 'login') {
                     result = await login(formData.email, formData.password);
                 } else {
                     result = await signup(formData.name, formData.email, formData.password);
@@ -1031,7 +1100,7 @@
                     <div className="modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
                         <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
                         <h2 className="modal-title" id="auth-modal-title">
-                            {mode === 'login' ? 'Welcome Back' : 'Join the Society'}
+                            {mode === 'login' ? 'Welcome Back' : mode === 'signup' ? 'Join the Society' : 'Reset Password'}
                         </h2>
 
                         <form onSubmit={handleSubmit}>
@@ -1059,37 +1128,57 @@
                                 />
                             </div>
                             
-                            <div className="form-group">
-                                <label className="form-label">Password</label>
-                                <input
-                                    type="password"
-                                    className="form-input"
-                                    value={formData.password}
-                                    onChange={e => setFormData({...formData, password: e.target.value})}
-                                    required
-                                    minLength="6"
-                                />
-                            </div>
+                            {mode !== 'reset' && (
+                                <div className="form-group">
+                                    <label className="form-label">Password</label>
+                                    <input
+                                        type="password"
+                                        className="form-input"
+                                        value={formData.password}
+                                        onChange={e => setFormData({...formData, password: e.target.value})}
+                                        required
+                                        minLength="6"
+                                    />
+                                </div>
+                            )}
+
+                            {mode === 'login' && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setMode('reset'); setError(''); setSuccessMsg(''); }}
+                                    style={{
+                                        background: 'none', border: 'none', color: 'var(--text-secondary)',
+                                        cursor: 'pointer', fontSize: '0.85rem', padding: 0, marginTop: '-0.5rem'
+                                    }}
+                                >
+                                    Forgot password?
+                                </button>
+                            )}
                             
+                            {mode === 'signup' && (
+                                <div ref={authTurnstileRef} style={{margin: '0.5rem 0'}}></div>
+                            )}
+
                             {error && <div className="form-error">{error}</div>}
                             {successMsg && <div className="form-error" style={{color: 'var(--code-green)', borderColor: 'var(--code-green)'}}>{successMsg}</div>}
-                            
-                            <button 
-                                type="submit" 
-                                className="btn btn-primary" 
+
+                            <button
+                                type="submit"
+                                className="btn btn-primary"
                                 style={{width: '100%', marginTop: '1rem'}}
-                                disabled={loading}
+                                disabled={loading || (mode === 'signup' && !authTurnstileToken)}
                             >
-                                {loading ? 'Processing...' : (mode === 'login' ? 'Login' : 'Sign Up')}
+                                {loading ? 'Processing...' : (mode === 'login' ? 'Login' : mode === 'signup' ? 'Sign Up' : 'Send Reset Link')}
                             </button>
                         </form>
                         
                         <p style={{textAlign: 'center', marginTop: '1.5rem', fontSize: '0.9rem'}}>
-                            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-                            <button 
+                            {mode === 'login' ? "Don't have an account? " : mode === 'signup' ? 'Already have an account? ' : 'Remember your password? '}
+                            <button
                                 onClick={() => {
                                     setMode(mode === 'login' ? 'signup' : 'login');
                                     setError('');
+                                    setSuccessMsg('');
                                 }}
                                 style={{
                                     background: 'none',
@@ -1116,6 +1205,7 @@
             const [loading, setLoading] = useState(false);
             const [commentsLoading, setCommentsLoading] = useState(true);
             const [commentError, setCommentError] = useState('');
+            const [visibleComments, setVisibleComments] = useState(5);
 
             if (!project) return null;
 
@@ -1203,6 +1293,62 @@
                 } catch (error) {
                     console.error('Failed to delete comment:', error);
                     setCommentError('Failed to delete comment. Please try again.');
+                }
+            };
+
+            const [editingComment, setEditingComment] = useState(null);
+            const [editContent, setEditContent] = useState('');
+            const [reportedComments, setReportedComments] = useState(new Set());
+
+            const handleEditComment = async (commentId) => {
+                if (!editContent.trim()) return;
+                try {
+                    const { error } = await supabase
+                        .from('comments')
+                        .update({ content: editContent.trim() })
+                        .eq('id', commentId);
+
+                    if (error) throw error;
+
+                    setComments(comments.map(c =>
+                        c.id === commentId ? { ...c, content: editContent.trim() } : c
+                    ));
+                    setEditingComment(null);
+                    setEditContent('');
+                } catch (error) {
+                    console.error('Failed to edit comment:', error);
+                    setCommentError('Failed to edit comment. Please try again.');
+                }
+            };
+
+            const handleReportComment = async (commentId) => {
+                if (!currentUser) {
+                    setShowAuthModal(true);
+                    return;
+                }
+                if (reportedComments.has(commentId)) return;
+
+                try {
+                    const { error } = await supabase
+                        .from('comment_reports')
+                        .insert([{
+                            comment_id: commentId,
+                            reporter_id: currentUser.id,
+                            reason: 'Reported by user'
+                        }]);
+
+                    if (error) {
+                        if (error.code === '23505') {
+                            setCommentError('You have already reported this comment.');
+                        } else {
+                            throw error;
+                        }
+                    } else {
+                        setReportedComments(prev => new Set([...prev, commentId]));
+                    }
+                } catch (error) {
+                    console.error('Failed to report comment:', error);
+                    setCommentError('Failed to report comment. Please try again.');
                 }
             };
 
@@ -1299,7 +1445,7 @@
                                     <>
                                         {comments.length > 0 ? (
                                             <div className="comments-list">
-                                                {comments.map(comment => (
+                                                {comments.slice(0, visibleComments).map(comment => (
                                                     <div key={comment.id} className="comment-item">
                                                         <div className="comment-header">
                                                             <div>
@@ -1308,20 +1454,87 @@
                                                                 </span>
                                                                 <span className="comment-date"> • {formatDate(comment.created_at)}</span>
                                                             </div>
-                                                            {currentUser && currentUser.id === comment.author_id && (
-                                                                <div className="comment-actions">
-                                                                    <button 
+                                                            <div className="comment-actions">
+                                                                {currentUser && currentUser.id === comment.author_id && (
+                                                                    <>
+                                                                        <button
+                                                                            className="comment-delete-btn"
+                                                                            style={{color: 'var(--code-green)'}}
+                                                                            onClick={() => { setEditingComment(comment.id); setEditContent(comment.content); }}
+                                                                        >
+                                                                            Edit
+                                                                        </button>
+                                                                        <button
+                                                                            className="comment-delete-btn"
+                                                                            onClick={() => handleDeleteComment(comment.id)}
+                                                                        >
+                                                                            Delete
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                                {currentUser && currentUser.id !== comment.author_id && (
+                                                                    <button
                                                                         className="comment-delete-btn"
-                                                                        onClick={() => handleDeleteComment(comment.id)}
+                                                                        style={{color: reportedComments.has(comment.id) ? 'var(--text-secondary)' : 'var(--error)'}}
+                                                                        onClick={() => handleReportComment(comment.id)}
+                                                                        disabled={reportedComments.has(comment.id)}
                                                                     >
-                                                                        Delete
+                                                                        {reportedComments.has(comment.id) ? 'Reported' : 'Report'}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {editingComment === comment.id ? (
+                                                            <div style={{marginTop: '0.5rem'}}>
+                                                                <textarea
+                                                                    value={editContent}
+                                                                    onChange={(e) => setEditContent(e.target.value)}
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        minHeight: '80px',
+                                                                        padding: '0.5rem',
+                                                                        borderRadius: '8px',
+                                                                        border: '1px solid var(--border)',
+                                                                        backgroundColor: 'var(--bg)',
+                                                                        color: 'var(--text)',
+                                                                        fontFamily: 'inherit',
+                                                                        fontSize: '0.9rem',
+                                                                        resize: 'vertical'
+                                                                    }}
+                                                                    maxLength={1000}
+                                                                />
+                                                                <div style={{display: 'flex', gap: '0.5rem', marginTop: '0.5rem'}}>
+                                                                    <button
+                                                                        onClick={() => handleEditComment(comment.id)}
+                                                                        className="btn btn-primary"
+                                                                        style={{padding: '0.3rem 0.8rem', fontSize: '0.85rem'}}
+                                                                    >
+                                                                        Save
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => { setEditingComment(null); setEditContent(''); }}
+                                                                        className="btn"
+                                                                        style={{padding: '0.3rem 0.8rem', fontSize: '0.85rem'}}
+                                                                    >
+                                                                        Cancel
                                                                     </button>
                                                                 </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="comment-content">{comment.content}</div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="comment-content">{comment.content}</div>
+                                                        )}
                                                     </div>
                                                 ))}
+                                                {comments.length > visibleComments && (
+                                                    <div style={{textAlign: 'center', marginTop: '1rem'}}>
+                                                        <button
+                                                            className="btn btn-secondary btn-small"
+                                                            onClick={() => setVisibleComments(prev => prev + 5)}
+                                                        >
+                                                            Load More Comments ({comments.length - visibleComments} remaining)
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         ) : (
                                             <div className="comments-empty">
@@ -1669,6 +1882,7 @@
             const [debouncedSearch, setDebouncedSearch] = useState('');
             const [filterLanguage, setFilterLanguage] = useState('all');
             const [sortBy, setSortBy] = useState('newest');
+            const [visibleProjects, setVisibleProjects] = useState(12);
 
             useEffect(() => {
                 const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -1929,7 +2143,7 @@
                         </div>
                     ) : (
                         <div className="projects-grid">
-                            {filteredProjects.map(project => (
+                            {filteredProjects.slice(0, visibleProjects).map(project => (
                                 <div
                                     key={project.id}
                                     className="project-card"
@@ -1958,7 +2172,18 @@
                             ))}
                         </div>
                     )}
-                    
+
+                    {filteredProjects.length > visibleProjects && (
+                        <div style={{textAlign: 'center', marginTop: '2rem'}}>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => setVisibleProjects(prev => prev + 12)}
+                            >
+                                Load More ({filteredProjects.length - visibleProjects} remaining)
+                            </button>
+                        </div>
+                    )}
+
                     {/* NEW: Project Detail Modal */}
                     {selectedProject && (
                         <ProjectDetailModal 
