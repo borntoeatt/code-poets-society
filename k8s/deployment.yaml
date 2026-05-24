@@ -14,8 +14,16 @@ spec:
     spec:
       containers:
       - name: website
-        image: borntoeatt/code-poets-society:latest
-        imagePullPolicy: Always
+        # Pinned to a specific manifest-list digest (multi-arch index).
+        # Pinning by digest makes the deployment fully reproducible —
+        # the image kubelet pulls today is byte-identical to what runs
+        # in a year. Bump this line manually when pushing a new build:
+        #   docker buildx imagetools inspect borntoeatt/code-poets-society:latest
+        # and replace the @sha256:... with the new index digest.
+        image: borntoeatt/code-poets-society@sha256:931810f99bd72fe3ebc6ad9fa36b47be1059b369cfda155a5fb330be5f13db8b
+        # IfNotPresent is correct with digest-pinned images — the digest
+        # already guarantees content, no need to re-pull on every restart.
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
         resources:
