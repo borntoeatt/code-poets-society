@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: code-poets-society
 spec:
-  replicas: 2  # Will be managed by HPA
+  replicas: 3  # Will be managed by HPA
   selector:
     matchLabels:
       app: code-poets-society
