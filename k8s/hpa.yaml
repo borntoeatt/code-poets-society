@@ -7,7 +7,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: code-poets-society
-  minReplicas: 2  # Maintain at least 2 replicas
+  minReplicas: 3  # Maintain at least 2 replicas
   maxReplicas: 10  # Handle traffic spikes up to 10 replicas
   metrics:
   - type: Resource
