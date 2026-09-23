@@ -2,15 +2,19 @@
     --ink: #1a1a1a;
     --paper: #fdfdf8;
     --accent: #d4af37;
-    --code-green: #4a9d5f;
+    --code-green: #2e7d46;
     --shadow: rgba(0, 0, 0, 0.1);
     --border: #e0e0d8;
-    --error: #e74c3c;
+    --error: #c0392b;
     --success: #27ae60;
     --card-bg: #ffffff;
     --text-secondary: #666666;
     --input-bg: #ffffff;
-    --hover-bg: rgba(74, 157, 95, 0.05);
+    --hover-bg: rgba(46, 125, 70, 0.05);
+    /* Text/borders placed ON the green or error surfaces. White passes on the
+       darker light-theme accents; the bright dark-theme accents need ink. */
+    --on-accent: #ffffff;
+    --on-accent-bg: rgba(0, 0, 0, 0.1);
 }
 
 [data-theme="dark"] {
@@ -26,6 +30,19 @@
     --text-secondary: #aaaaaa;
     --input-bg: #2d2d2d;
     --hover-bg: rgba(95, 212, 122, 0.1);
+    --on-accent: #1a1a1a;
+    --on-accent-bg: rgba(0, 0, 0, 0.08);
+}
+
+/* Fallback with Playfair-like metrics: the hero renders at the same size in
+   the system serif until the web font loads, so the swap causes no shift. */
+@font-face {
+    font-family: 'Playfair Fallback';
+    src: local('Times New Roman'), local('Times');
+    size-adjust: 107%;
+    ascent-override: 108%;
+    descent-override: 27%;
+    line-gap-override: 0%;
 }
 
 * {
@@ -117,7 +134,7 @@ body {
     height: 35px;
     border-radius: 50%;
     background: var(--code-green);
-    color: white;
+    color: var(--on-accent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -172,7 +189,13 @@ input:checked + .slider {
 
 input:checked + .slider:before {
     transform: translateX(24px);
-    background-color: white;
+    background-color: var(--on-accent);
+}
+
+/* The real checkbox is invisible; show keyboard focus on the visible switch. */
+.theme-switch input:focus-visible + .slider {
+    outline: 3px solid var(--code-green);
+    outline-offset: 2px;
 }
 
 /* Main Content */
@@ -335,9 +358,23 @@ input:checked + .slider:before {
     font-weight: 700;
 }
 
+.project-title a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.project-title a:hover {
+    text-decoration: underline;
+}
+
+.project-title a:focus-visible {
+    outline: 3px solid var(--code-green);
+    outline-offset: 2px;
+}
+
 .project-tag {
     background: var(--code-green);
-    color: white;
+    color: var(--on-accent);
     padding: 0.3rem 0.8rem;
     font-size: 0.75rem;
     font-weight: 600;
@@ -399,7 +436,7 @@ input:checked + .slider:before {
 
 .playground-toolbar {
     background: var(--ink);
-    color: white;
+    color: var(--paper);
     padding: 0.5rem 1rem;
     font-size: 0.85rem;
     display: flex;
@@ -418,8 +455,9 @@ input:checked + .slider:before {
     color: #d4d4d4;
 }
 
-.playground-textarea:focus {
-    outline: none;
+.playground-textarea:focus-visible {
+    outline: 3px solid var(--code-green);
+    outline-offset: -3px;
 }
 
 .playground-preview {
@@ -463,6 +501,8 @@ input:checked + .slider:before {
     font-size: 2rem;
     font-weight: 700;
     margin-bottom: 1.5rem;
+    padding-right: 2.5rem;      /* clear the 40px close button at right: 1rem */
+    overflow-wrap: anywhere;    /* long unbreakable titles wrap instead of scrolling */
 }
 
 .modal-close {
@@ -487,11 +527,6 @@ input:checked + .slider:before {
     background: var(--hover-bg);
 }
 
-/* NEW: Project Detail styles */
-.project-detail-header {
-    padding-right: 3rem;
-}
-
 .project-detail-meta {
     display: flex;
     gap: 1.5rem;
@@ -510,7 +545,7 @@ input:checked + .slider:before {
 
 .tech-tag {
     background: var(--code-green);
-    color: white;
+    color: var(--on-accent);
     padding: 0.4rem 0.8rem;
     font-size: 0.8rem;
     font-weight: 600;
@@ -551,6 +586,12 @@ input:checked + .slider:before {
 }
 
 @media (max-width: 768px) {
+    /* The stacked header is ~190px tall here; pinning it eats the viewport. */
+    .header {
+        position: static;
+        padding: 1rem 5%;
+    }
+
     .header-content {
         flex-direction: column;
         gap: 1rem;
@@ -566,6 +607,21 @@ input:checked + .slider:before {
     }
 }
 
+@media (max-width: 480px) {
+    .modal {
+        padding: 1.5rem 1rem;
+    }
+
+    .newsletter-section {
+        padding: 3rem 1rem;
+    }
+
+    .newsletter-input {
+        min-width: 0;
+        width: 100%;
+    }
+}
+
 /* Hero Section */
 .hero {
     padding: 4rem 0;
@@ -573,7 +629,7 @@ input:checked + .slider:before {
 }
 
 .hero-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
     font-size: 4rem;
     font-weight: 900;
     line-height: 1.1;
@@ -646,7 +702,7 @@ input:checked + .slider:before {
 /* Newsletter Section */
 .newsletter-section {
     background: var(--code-green);
-    color: white;
+    color: var(--on-accent);
     padding: 4rem 2rem;
     margin: 4rem 0;
     text-align: center;
@@ -673,25 +729,27 @@ input:checked + .slider:before {
     min-width: 250px;
     padding: 1rem 1.5rem;
     font-family: 'Space Mono', monospace;
-    border: 3px solid white;
+    border: 3px solid var(--on-accent);
     background: transparent;
-    color: white;
+    color: var(--on-accent);
     font-size: 1rem;
 }
 
 .newsletter-input::placeholder {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--on-accent);
+    opacity: 0.95;
+    font-style: italic;
 }
 
 .newsletter-input:focus {
     outline: none;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--on-accent-bg);
 }
 
 .newsletter-message {
     margin-top: 1rem;
     padding: 1rem;
-    border: 2px solid white;
+    border: 2px solid var(--on-accent);
     display: none;
 }
 
@@ -833,7 +891,7 @@ input:checked + .slider:before {
 /* Site-wide notice (e.g. backend unreachable) */
 .notice-banner {
     background: var(--error);
-    color: white;
+    color: var(--on-accent);
     padding: 0.8rem 5%;
     text-align: center;
     font-size: 0.9rem;
@@ -847,6 +905,29 @@ input:checked + .slider:before {
     border: none;
     color: var(--ink);
     padding: 0;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.logo:focus-visible {
+    outline: 3px solid var(--code-green);
+    outline-offset: 4px;
+}
+
+/* Route changes move focus here for screen readers; no ring needed. */
+main:focus {
+    outline: none;
+}
+
+.notice-dismiss {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1.3rem;
+    line-height: 1;
+    margin-left: 1rem;
+    cursor: pointer;
+    vertical-align: middle;
 }
 
 .link-button {

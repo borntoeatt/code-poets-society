@@ -64,6 +64,7 @@ export default function NewsletterSection() {
                     required
                 />
                 <div ref={turnstile.containerRef} style={{ margin: '0.5rem 0' }} />
+                {turnstile.error && <div className="newsletter-message" role="alert" style={{ display: 'block', width: '100%' }}>{turnstile.error}</div>}
                 <button type="submit" className="btn btn-primary" disabled={loading || !turnstile.token}>
                     {loading ? 'Subscribing...' : 'Subscribe'}
                 </button>

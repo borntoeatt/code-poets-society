@@ -33,16 +33,24 @@ async function fetchGithubProjects() {
     return items;
 }
 
-function validateForm(form) {
+// Postgres length() counts code points; JS .length counts UTF-16 units, so
+// count code points here to agree with the CHECK constraints on emoji input.
+const codePoints = (s) => [...s].length;
+
+export function validateForm(form) {
     const title = form.title.trim();
     const description = form.description.trim();
-    if (title.length < LIMITS.titleMin || title.length > LIMITS.titleMax) {
+    if (codePoints(title) < LIMITS.titleMin || codePoints(title) > LIMITS.titleMax) {
         return `Title must be between ${LIMITS.titleMin} and ${LIMITS.titleMax} characters.`;
     }
-    if (!description || description.length > LIMITS.descriptionMax) {
+    if (!description || codePoints(description) > LIMITS.descriptionMax) {
         return `Description must be between 1 and ${LIMITS.descriptionMax} characters.`;
     }
-    if (parseTechStack(form.tech_stack).length === 0) return 'Add at least one technology.';
+    const tech = parseTechStack(form.tech_stack);
+    if (tech.length === 0) return 'Add at least one technology.';
+    if (codePoints(tech.join('')) > LIMITS.techStackTotalMax) {
+        return `Tech stack is too long (max ${LIMITS.techStackTotalMax} characters in total).`;
+    }
     if (form.github_url && !isGithubRepoUrl(form.github_url)) {
         return 'GitHub URL must look like https://github.com/user/repo.';
     }
@@ -53,6 +61,7 @@ function validateForm(form) {
 export default function ProjectsPage({ currentUser, onLogin, selectedId, onBackendError }) {
     const [projects, setProjects] = useState([]);
     const [githubProjects, setGithubProjects] = useState([]);
+    const [githubSettled, setGithubSettled] = useState(false);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
     const [showSubmitForm, setShowSubmitForm] = useState(false);
@@ -73,9 +82,11 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
     const loadProjects = async () => {
         setLoading(true);
         setLoadError('');
+        // Explicit columns: the list never depends on large optional fields
+        // (long_description etc.), so one oversized row can't slow everyone.
         const { data, error } = await supabase
             .from('projects')
-            .select('*, profiles!projects_author_id_fkey(username)')
+            .select('id, title, description, tech_stack, github_url, demo_url, stars_count, status, created_at, profiles!projects_author_id_fkey(username)')
             .order('created_at', { ascending: false });
         if (error) {
             console.error('Failed to load projects:', error);
@@ -90,7 +101,10 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
     useEffect(() => {
         loadProjects();
         // GitHub picks are decorative; a failure there shouldn't block the page.
-        fetchGithubProjects().then(setGithubProjects).catch((err) => console.error('GitHub fetch failed:', err));
+        fetchGithubProjects()
+            .then(setGithubProjects)
+            .catch((err) => console.error('GitHub fetch failed:', err))
+            .finally(() => setGithubSettled(true));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -179,6 +193,10 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
     );
 
     const selectedProject = selectedId ? allProjects.find((p) => p.id === selectedId) : null;
+    // A shared link to a deleted project, or to a GitHub pick this browser
+    // didn't fetch (the picks are a random topic per visitor), resolves to nothing.
+    // Only when the list actually loaded: if it failed, the load error says so.
+    const notFound = Boolean(selectedId) && !loading && !loadError && githubSettled && !selectedProject;
     const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
 
     return (
@@ -250,6 +268,12 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
             </div>
 
             {loadError && <div className="form-error" role="alert" style={{ marginBottom: '1rem' }}>{loadError}</div>}
+            {notFound && (
+                <div className="form-error" role="alert" style={{ marginBottom: '1rem' }}>
+                    That project could not be found. It may have been removed, or it was a featured GitHub pick
+                    that is no longer shown. <a href="#/projects">Back to all projects</a>
+                </div>
+            )}
 
             {loading ? (
                 <div className="loading">Loading projects...</div>
@@ -261,22 +285,20 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
             ) : (
                 <div className="projects-grid">
                     {filteredProjects.slice(0, visible).map((project) => (
+                        // The title is the real link (keyboard + screen readers keep the
+                        // heading, author and description); the card stays clickable for
+                        // pointer users. A role=button card would hide all of its content.
                         <div
                             key={project.id}
                             className="project-card"
                             onClick={() => navigate(`/projects/${project.id}`)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    navigate(`/projects/${project.id}`);
-                                }
-                            }}
-                            tabIndex={0}
-                            role="button"
-                            aria-label={`View project: ${project.title}`}
                         >
                             <div className="project-header">
-                                <h3 className="project-title">{project.title}</h3>
+                                <h3 className="project-title">
+                                    <a href={`#/projects/${project.id}`} onClick={(e) => e.stopPropagation()}>
+                                        {project.title}
+                                    </a>
+                                </h3>
                                 {project.language && <span className="project-tag">{project.language}</span>}
                             </div>
                             <div className="project-author">

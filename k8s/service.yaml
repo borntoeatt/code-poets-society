@@ -2,6 +2,15 @@ apiVersion: v1
 kind: Service
 metadata:
   name: code-poets-society
+  annotations:
+    # Pin each visitor to one pod (Traefik sticky cookie) so that during a
+    # rolling update the HTML and its hashed assets come from the same image.
+    # Strictly-necessary load-balancing cookie: no personal data, no consent needed.
+    traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.name: "cps_srv"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.secure: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.httponly: "true"
+    traefik.ingress.kubernetes.io/service.sticky.cookie.samesite: "lax"
 spec:
   selector:
     app: code-poets-society

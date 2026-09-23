@@ -116,6 +116,7 @@ export default function AuthModal({ auth, onClose }) {
                 )}
 
                 <div ref={turnstile.containerRef} style={{ margin: '0.5rem 0' }} />
+                {turnstile.error && <div className="form-error" role="alert">{turnstile.error}</div>}
 
                 {error && <div className="form-error" role="alert">{error}</div>}
                 {successMsg && <div className="form-success-msg" role="status">{successMsg}</div>}

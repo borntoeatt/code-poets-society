@@ -31,11 +31,14 @@ Run these in the Supabase **SQL Editor**, in order:
    newsletter-privacy and URL-injection holes in the base schema
 5. `migrations/005_protect_timestamps.sql` — **required**: makes created_at /
    updated_at / starred_at server-set, so rate limits can't be back-dated
+6. `migrations/006_concurrency_and_bounds.sql` — **required**: rate limits
+   and username generation are safe under concurrent requests; project
+   columns are size-bounded so one row can't break the list page
 
 (`001_add_rate_limiting.sql` is already included in `supabase-schema.sql`.)
 
 On an existing project, run only the migrations you haven't applied yet.
-`004` and `005` are safe to re-run.
+`004`, `005` and `006` are safe to re-run.
 
 ### 2. Auth settings
 
@@ -99,13 +102,44 @@ every location block.
    image once, scans it with Trivy (fails on CRITICAL/HIGH), pushes that
    exact image to Docker Hub tagged `latest` and `<sha>`.
 2. CI then rewrites the digest in `k8s/deployment.yaml` and commits it to
-   `main` as `github-actions[bot]`.
-3. Argo CD syncs the new digest; Kubernetes rolls the pods.
+   `main` as `github-actions[bot]`. It skips this when a newer
+   image-producing commit is already on `main` (that commit's run pins
+   instead), so a late or re-run job can never roll production back.
+3. Argo CD syncs the new digest; Kubernetes rolls the pods. The Deployment
+   uses `maxSurge: 100%` / `maxUnavailable: 0` and the Service pins each
+   visitor to one pod (Traefik sticky cookie `cps_srv`), so nobody loads
+   HTML from a new pod and its hashed assets from an old one.
 
-Between steps 1 and 2 (a few minutes) Argo may already have applied the new
-pod spec with the *old* digest. That pod fails to start (the old image needs
-root), the rollout waits, and the existing pods keep serving. It resolves on
-its own once the digest commit lands. To watch:
+The Deployment deliberately has no `replicas` field: the HPA owns the count.
+This relies on the Argo `Application` using `ServerSideApply=true` (it does):
+the HPA's scale subresource co-owns `spec.replicas`, so Argo dropping the
+field leaves the live count alone. Check before changing the manifest's
+replica handling:
+
+```bash
+kubectl -n codepoets apply --server-side --force-conflicts \
+  --field-manager=argocd-controller --dry-run=server \
+  -f k8s/deployment.yaml -o jsonpath='{.spec.replicas}'
+```
+
+If Argo is ever switched to client-side apply, first add this to the
+`Application` (it lives in the k3s-apps repo, not here), otherwise the first
+sync after removing `replicas` drops the Deployment to 1 pod:
+
+```yaml
+spec:
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: code-poets-society
+      jsonPointers: [/spec/replicas]
+  syncPolicy:
+    syncOptions: [RespectIgnoreDifferences=true]
+```
+
+When a merge changes both code and `k8s/`, Argo applies the manifest change
+first (still with the previous digest) and the digest commit a few minutes
+later, so you'll see two quick rollouts. To watch:
 
 ```bash
 kubectl -n codepoets rollout status deploy/code-poets-society

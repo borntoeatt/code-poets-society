@@ -39,6 +39,13 @@ jobs:
     name: Docker image
     needs: check
     runs-on: ubuntu-latest
+    # Reduces overlap between runs. Note GitHub keeps only one PENDING run
+    # per group (older pending runs are cancelled), and runs enter the group
+    # when `check` finishes, not in commit order. Correct ordering therefore
+    # comes from the pin step's newer-commit guard, not from this queue.
+    concurrency:
+      group: docker-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write   # to commit the new image digest into k8s/deployment.yaml
     steps:
@@ -97,13 +104,34 @@ jobs:
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
-          sed -i -E "s|(image: [^@]+)@sha256:[0-9a-f]{64}|\1@${DIGEST}|" k8s/deployment.yaml
-          if git diff --quiet -- k8s/deployment.yaml; then
-            echo "Digest unchanged; nothing to commit."
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "k8s: deploy ${GITHUB_SHA::7} (${DIGEST::19}…)" -- k8s/deployment.yaml
-          git pull --rebase origin main
-          git push origin HEAD:main
+          for attempt in 1 2 3; do
+            # Fetch main's history down to this run's commit (the checkout is
+            # shallow at GITHUB_SHA, so this only pulls the newer commits).
+            git fetch -q origin main
+            # If main has moved on with an image-producing change (anything
+            # outside k8s/ and *.md, mirroring paths-ignore above), that
+            # commit's own run pins its newer image. Pinning ours now would
+            # roll production back, e.g. on a re-run of an old failed run.
+            if [ -n "$(git log --format=%H "$GITHUB_SHA..FETCH_HEAD" -- . ':!k8s' ':!*.md')" ]; then
+              echo "A newer image-producing commit is on main; its run pins the digest. Skipping."
+              exit 0
+            fi
+            # Edit main's CURRENT copy of the file (not the trigger commit's)
+            # so there is never a conflict on the digest line.
+            git checkout -q --force FETCH_HEAD
+            sed -i -E "s|(image: [^@]+)@sha256:[0-9a-f]{64}|\1@${DIGEST}|" k8s/deployment.yaml
+            if git diff --quiet -- k8s/deployment.yaml; then
+              echo "Digest already pinned; nothing to commit."
+              exit 0
+            fi
+            git commit -q -m "k8s: deploy ${GITHUB_SHA::7} (${DIGEST::19}…)" -- k8s/deployment.yaml
+            # A concurrent push to main rejects this one; loop and redo it on the new tip.
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push rejected (main moved); retrying ($attempt/3)."
+          done
+          echo "Could not pin the digest after 3 attempts." >&2
+          exit 1
