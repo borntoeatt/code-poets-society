@@ -39,15 +39,16 @@ On an existing project, run only the migrations you haven't applied yet.
 
 ### 2. Auth settings
 
-Dashboard → **Authentication → Settings**:
+Dashboard → **Authentication → Attack Protection** (under *Configuration*):
 
 - Enable **Captcha protection**, provider **Turnstile**, and paste the
   Turnstile *secret* key. This setting is project-wide: it gates sign-up,
   password login and password reset. The auth modal shows the widget in all
   three modes and sends the token with every request, so nothing breaks
   when you turn it on. Without the setting the CAPTCHA is decorative.
-- Set **Site URL** to `https://codepoetssociety.info` so password-reset links
-  return to the app (the app shows a "set new password" form on arrival).
+- Under **Authentication → URL Configuration**, set **Site URL** to
+  `https://codepoetssociety.info` so password-reset links return to the app
+  (the app shows a "set new password" form on arrival).
 
 ### 3. Newsletter Edge Function
 
