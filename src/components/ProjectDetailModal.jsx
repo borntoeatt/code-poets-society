@@ -251,7 +251,8 @@ export default function ProjectDetailModal({ project, onClose, currentUser, onLo
                     ) : (
                         <div className="comment-login-prompt">
                             <p style={{ marginBottom: '0.5rem' }}>Sign in to leave a comment</p>
-                            <button className="btn btn-primary btn-small" onClick={() => { onClose(); onLogin(); }}>
+                            {/* Opens the auth modal on top; after login the comment form appears here. */}
+                            <button className="btn btn-primary btn-small" onClick={onLogin}>
                                 Sign In
                             </button>
                         </div>

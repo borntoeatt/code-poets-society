@@ -17,4 +17,6 @@ export const LIMITS = {
     titleMax: 150,
     descriptionMax: 2000,
     commentMax: 1000,
+    techStackMax: 20,
+    techStackTotalMax: 1000,
 };

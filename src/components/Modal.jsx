@@ -2,24 +2,36 @@ import { useEffect, useRef } from 'react';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
+// Modals can stack (e.g. the auth modal opened from inside a project modal).
+// A module-level stack keeps body scroll-locking and keyboard handling
+// correct regardless of mount/unmount order: only the topmost dialog reacts
+// to Escape/Tab, and the scroll lock is released when the last one closes.
+const openDialogs = [];
+
 // Accessible modal shell: closes on Escape and overlay click, traps Tab focus,
 // restores focus to the opener on close.
 export default function Modal({ title, titleId, onClose, children, maxWidth }) {
     const dialogRef = useRef(null);
-    // Keep the latest onClose in a ref so the focus setup below runs exactly
-    // once per mount. Re-running it on every parent re-render (e.g. an auth
-    // token refresh) would yank focus away from whatever the user is typing in.
+    // Latest onClose in a ref so the setup effect runs exactly once per mount.
+    // Re-running it on every parent re-render (e.g. an auth token refresh)
+    // would yank focus away from whatever the user is typing in.
     const onCloseRef = useRef(onClose);
     useEffect(() => {
         onCloseRef.current = onClose;
     });
+    // A click only counts as "outside" when the press started outside too;
+    // otherwise drag-selecting text out of a textarea would close the modal.
+    const pressedOnOverlay = useRef(false);
 
     useEffect(() => {
         const opener = document.activeElement;
         const dialog = dialogRef.current;
+        openDialogs.push(dialog);
+        if (openDialogs.length === 1) document.body.style.overflow = 'hidden';
         dialog?.querySelector(FOCUSABLE)?.focus();
 
         const onKey = (e) => {
+            if (openDialogs[openDialogs.length - 1] !== dialog) return;
             if (e.key === 'Escape') {
                 onCloseRef.current();
                 return;
@@ -39,22 +51,35 @@ export default function Modal({ title, titleId, onClose, children, maxWidth }) {
         };
 
         document.addEventListener('keydown', onKey);
-        const prevOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
         return () => {
             document.removeEventListener('keydown', onKey);
-            document.body.style.overflow = prevOverflow;
-            if (opener instanceof HTMLElement) opener.focus();
+            const i = openDialogs.indexOf(dialog);
+            if (i !== -1) openDialogs.splice(i, 1);
+            if (openDialogs.length === 0) document.body.style.overflow = '';
+            const active = document.activeElement;
+            const focusInsideAnotherDialog = openDialogs.some((d) => d?.contains(active));
+            if (opener instanceof HTMLElement && opener.isConnected && !focusInsideAnotherDialog) {
+                opener.focus();
+            }
         };
     }, []);
 
     return (
-        <div className="modal-overlay" onClick={onClose} role="presentation">
+        <div
+            className="modal-overlay"
+            role="presentation"
+            onMouseDown={(e) => {
+                pressedOnOverlay.current = e.target === e.currentTarget;
+            }}
+            onClick={(e) => {
+                if (pressedOnOverlay.current && e.target === e.currentTarget) onCloseRef.current();
+                pressedOnOverlay.current = false;
+            }}
+        >
             <div
                 ref={dialogRef}
                 className="modal"
                 style={maxWidth ? { maxWidth } : undefined}
-                onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={titleId}

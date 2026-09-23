@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { navigate } from '../hooks/useHashRoute.js';
 
 const NAV = [
     { page: 'home', label: 'Home', path: '/' },
@@ -16,32 +15,38 @@ export default function Header({ currentPage, currentUser, logout, onLogin }) {
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
+    }, [theme]);
+
+    // Persist only on an explicit toggle. Writing the OS-derived default on
+    // mount would freeze the visitor's system preference at first visit.
+    const toggleTheme = () => {
+        const next = theme === 'light' ? 'dark' : 'light';
+        setTheme(next);
         try {
-            localStorage.setItem('theme', theme);
+            localStorage.setItem('theme', next);
         } catch {
             /* storage unavailable */
         }
-    }, [theme]);
-
-    const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
+    };
     const nextTheme = theme === 'light' ? 'dark' : 'light';
 
     return (
         <header className="header">
             <div className="header-content">
-                <button className="logo" onClick={() => navigate('/')} aria-label="Code Poets Society home">
+                {/* Real links: middle-click / copy-link work and aria-current is valid. */}
+                <a className="logo" href="#/" aria-label="Code Poets Society home">
                     <span className="code">&lt;code&gt;</span> Poets Society <span className="code">&lt;/code&gt;</span>
-                </button>
+                </a>
                 <nav className="nav" aria-label="Main">
                     {NAV.map(({ page, label, path }) => (
-                        <button
+                        <a
                             key={page}
+                            href={`#${path}`}
                             className={`nav-link ${currentPage === page ? 'active' : ''}`}
-                            onClick={() => navigate(path)}
                             aria-current={currentPage === page ? 'page' : undefined}
                         >
                             {label}
-                        </button>
+                        </a>
                     ))}
 
                     <label className="theme-switch" title={`Switch to ${nextTheme} mode`}>

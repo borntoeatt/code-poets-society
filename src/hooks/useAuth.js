@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 
 function toUser(session) {
@@ -11,6 +11,19 @@ function toUser(session) {
     };
 }
 
+// Supabase redirects failed email links (expired recovery / confirmation) to
+// the site with the error in the URL fragment. auth-js does not emit an event
+// for these, so read them here and clear the fragment.
+function readAuthErrorFromUrl() {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (!params.get('error') && !params.get('error_description')) return null;
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (params.get('error_code') === 'otp_expired') {
+        return 'That link is invalid or has expired. Please request a new one.';
+    }
+    return params.get('error_description') || 'That sign-in link could not be used.';
+}
+
 // Single source of truth for auth state. Call this once in <App>; pass the
 // result down rather than calling it again in child components.
 export function useAuth() {
@@ -18,8 +31,11 @@ export function useAuth() {
     const [loading, setLoading] = useState(true);
     // Set when the user lands here from a password-reset email.
     const [recovering, setRecovering] = useState(false);
+    const [authError, setAuthError] = useState(null);
 
     useEffect(() => {
+        setAuthError(readAuthErrorFromUrl());
+
         supabase.auth.getSession().then(({ data: { session } }) => {
             setCurrentUser(toUser(session));
             setLoading(false);
@@ -33,6 +49,11 @@ export function useAuth() {
         return () => subscription.unsubscribe();
     }, []);
 
+    const clearAuthError = useCallback(() => setAuthError(null), []);
+
+    // Supabase "Captcha protection" is project-wide: once enabled it gates
+    // sign-up, password login and password reset alike, so every call sends
+    // the Turnstile token. When protection is off the token is simply ignored.
     const signup = async ({ name, email, password, captchaToken }) => {
         const { error } = await supabase.auth.signUp({
             email,
@@ -42,9 +63,6 @@ export function useAuth() {
         return error ? { success: false, error: error.message } : { success: true };
     };
 
-    // Supabase "Captcha protection" is project-wide: once enabled it gates
-    // sign-up, password login and password reset alike, so every call sends
-    // the Turnstile token. When protection is off the token is simply ignored.
     const login = async ({ email, password, captchaToken }) => {
         const { error } = await supabase.auth.signInWithPassword({
             email,
@@ -73,5 +91,8 @@ export function useAuth() {
         return error ? { success: false, error: error.message } : { success: true };
     };
 
-    return { currentUser, loading, recovering, signup, login, logout, resetPassword, updatePassword };
+    return {
+        currentUser, loading, recovering, authError, clearAuthError,
+        signup, login, logout, resetPassword, updatePassword,
+    };
 }

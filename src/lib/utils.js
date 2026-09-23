@@ -44,6 +44,6 @@ export function formatRelativeDate(dateString) {
     return date.toLocaleDateString();
 }
 
-export function parseTechStack(input) {
-    return [...new Set(input.split(',').map((t) => t.trim()).filter(Boolean))].slice(0, 20);
+export function parseTechStack(input, max = 20) {
+    return [...new Set(input.split(',').map((t) => t.trim()).filter(Boolean))].slice(0, max);
 }
