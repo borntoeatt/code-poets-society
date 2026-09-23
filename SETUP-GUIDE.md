@@ -29,19 +29,23 @@ Run these in the Supabase **SQL Editor**, in order:
 3. `migrations/003_comment_reports.sql`
 4. `migrations/004_lock_down_rls.sql` — **required**: closes the ownership,
    newsletter-privacy and URL-injection holes in the base schema
+5. `migrations/005_protect_timestamps.sql` — **required**: makes created_at /
+   updated_at / starred_at server-set, so rate limits can't be back-dated
 
 (`001_add_rate_limiting.sql` is already included in `supabase-schema.sql`.)
 
 On an existing project, run only the migrations you haven't applied yet.
-`004` is safe to re-run.
+`004` and `005` are safe to re-run.
 
 ### 2. Auth settings
 
 Dashboard → **Authentication → Settings**:
 
 - Enable **Captcha protection**, provider **Turnstile**, and paste the
-  Turnstile *secret* key. Sign-up sends the token as `captchaToken`; without
-  this setting the CAPTCHA is decorative.
+  Turnstile *secret* key. This setting is project-wide: it gates sign-up,
+  password login and password reset. The auth modal shows the widget in all
+  three modes and sends the token with every request, so nothing breaks
+  when you turn it on. Without the setting the CAPTCHA is decorative.
 - Set **Site URL** to `https://codepoetssociety.info` so password-reset links
   return to the app (the app shows a "set new password" form on arrival).
 
@@ -78,16 +82,35 @@ the `TURNSTILE_SECRET_KEY` function secret). Never put the secret in the app.
 
 ```bash
 docker build -t code-poets-society .
-docker run --rm -p 8080:8080 code-poets-society
+docker run --rm -p 8080:80 code-poets-society
 ```
 
-The image is `nginxinc/nginx-unprivileged` (non-root, port 8080, read-only
-root filesystem with `/tmp` as an `emptyDir`). Security headers live in
-`nginx-security-headers.conf` and are included in every location block.
+The image is `nginxinc/nginx-unprivileged` (uid 101, read-only root
+filesystem with `/tmp` as an `emptyDir`, all capabilities dropped). nginx
+still listens on **port 80** so the Service never changes; the pod grants the
+non-root bind with the safe `net.ipv4.ip_unprivileged_port_start=0` sysctl.
+Security headers live in `nginx-security-headers.conf` and are included in
+every location block.
 
-CI (`.github/workflows/docker.yml`) lints, builds, scans the image with Trivy
-(fails on CRITICAL/HIGH) and only then pushes to Docker Hub on `main`.
-`k8s/deployment.yaml` pins the image by digest — update it after each push:
+### Deploy flow (Argo CD auto-sync from `k8s/` on `main`)
+
+1. Merge to `main`. CI (`.github/workflows/docker.yml`) lints, builds the
+   image once, scans it with Trivy (fails on CRITICAL/HIGH), pushes that
+   exact image to Docker Hub tagged `latest` and `<sha>`.
+2. CI then rewrites the digest in `k8s/deployment.yaml` and commits it to
+   `main` as `github-actions[bot]`.
+3. Argo CD syncs the new digest; Kubernetes rolls the pods.
+
+Between steps 1 and 2 (a few minutes) Argo may already have applied the new
+pod spec with the *old* digest. That pod fails to start (the old image needs
+root), the rollout waits, and the existing pods keep serving. It resolves on
+its own once the digest commit lands. To watch:
+
+```bash
+kubectl -n codepoets rollout status deploy/code-poets-society
+```
+
+If CI is broken and you need to pin a digest by hand:
 
 ```bash
 docker buildx imagetools inspect borntoeatt/code-poets-society:latest

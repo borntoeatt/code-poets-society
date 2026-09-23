@@ -70,6 +70,7 @@ $$;
 -- 2. OWNERSHIP: you can only write rows as yourself
 -- =============================================
 DROP POLICY IF EXISTS "Authenticated users can create projects" ON public.projects;
+DROP POLICY IF EXISTS "Users can create their own projects" ON public.projects;
 CREATE POLICY "Users can create their own projects" ON public.projects
     FOR INSERT TO authenticated
     WITH CHECK (auth.uid() = author_id);
@@ -81,6 +82,7 @@ CREATE POLICY "Authors can update their projects" ON public.projects
     WITH CHECK (auth.uid() = author_id);
 
 DROP POLICY IF EXISTS "Authenticated users can create comments" ON public.comments;
+DROP POLICY IF EXISTS "Users can create their own comments" ON public.comments;
 CREATE POLICY "Users can create their own comments" ON public.comments
     FOR INSERT TO authenticated
     WITH CHECK (auth.uid() = author_id);
@@ -92,6 +94,7 @@ CREATE POLICY "Authors can update their comments" ON public.comments
     WITH CHECK (auth.uid() = author_id);
 
 DROP POLICY IF EXISTS "Authenticated users can star projects" ON public.project_stars;
+DROP POLICY IF EXISTS "Users can star projects as themselves" ON public.project_stars;
 CREATE POLICY "Users can star projects as themselves" ON public.project_stars
     FOR INSERT TO authenticated
     WITH CHECK (auth.uid() = user_id);

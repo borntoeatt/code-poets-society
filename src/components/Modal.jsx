@@ -6,6 +6,13 @@ const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [ta
 // restores focus to the opener on close.
 export default function Modal({ title, titleId, onClose, children, maxWidth }) {
     const dialogRef = useRef(null);
+    // Keep the latest onClose in a ref so the focus setup below runs exactly
+    // once per mount. Re-running it on every parent re-render (e.g. an auth
+    // token refresh) would yank focus away from whatever the user is typing in.
+    const onCloseRef = useRef(onClose);
+    useEffect(() => {
+        onCloseRef.current = onClose;
+    });
 
     useEffect(() => {
         const opener = document.activeElement;
@@ -14,7 +21,7 @@ export default function Modal({ title, titleId, onClose, children, maxWidth }) {
 
         const onKey = (e) => {
             if (e.key === 'Escape') {
-                onClose();
+                onCloseRef.current();
                 return;
             }
             if (e.key !== 'Tab' || !dialog) return;
@@ -39,7 +46,7 @@ export default function Modal({ title, titleId, onClose, children, maxWidth }) {
             document.body.style.overflow = prevOverflow;
             if (opener instanceof HTMLElement) opener.focus();
         };
-    }, [onClose]);
+    }, []);
 
     return (
         <div className="modal-overlay" onClick={onClose} role="presentation">

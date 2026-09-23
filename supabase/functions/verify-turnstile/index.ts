@@ -38,6 +38,17 @@ Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405, headers);
 
+    // Any unexpected throw must still produce a JSON body WITH CORS headers,
+    // otherwise the browser reports it as a network error.
+    try {
+        return await handle(req, headers);
+    } catch (err) {
+        console.error('Unhandled error:', err);
+        return json({ error: 'Subscription failed' }, 500, headers);
+    }
+});
+
+async function handle(req: Request, headers: Record<string, string>): Promise<Response> {
     const secret = Deno.env.get('TURNSTILE_SECRET_KEY');
     if (!secret) return json({ error: 'Server misconfigured' }, 500, headers);
 
@@ -89,4 +100,4 @@ Deno.serve(async (req) => {
     }
 
     return json({ ok: true }, 200, headers);
-});
+}

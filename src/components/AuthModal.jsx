@@ -10,9 +10,11 @@ export default function AuthModal({ auth, onClose }) {
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
     const [loading, setLoading] = useState(false);
-    // Turnstile is only shown for sign-up; the token is sent to Supabase Auth
-    // (requires "Captcha protection" enabled in the Supabase dashboard).
-    const turnstile = useTurnstile(mode === 'signup');
+    // Supabase "Captcha protection" (Turnstile) is project-wide and gates
+    // sign-up, login and password reset, so the widget is shown in every mode
+    // and the token sent with every request. Tokens are single-use, so the
+    // widget is reset after each submit.
+    const turnstile = useTurnstile(true);
 
     const switchMode = (next) => {
         setMode(next);
@@ -27,25 +29,26 @@ export default function AuthModal({ auth, onClose }) {
         setError('');
         setSuccessMsg('');
 
-        if (mode === 'signup' && !turnstile.token) {
+        if (!turnstile.token) {
             setError('Please complete the CAPTCHA verification');
             return;
         }
 
         setLoading(true);
+        const captchaToken = turnstile.token;
         let result;
         if (mode === 'reset') {
-            result = await auth.resetPassword(form.email);
+            result = await auth.resetPassword({ email: form.email, captchaToken });
         } else if (mode === 'login') {
-            result = await auth.login(form.email, form.password);
+            result = await auth.login({ email: form.email, password: form.password, captchaToken });
         } else {
-            result = await auth.signup({ ...form, captchaToken: turnstile.token });
+            result = await auth.signup({ ...form, captchaToken });
         }
         setLoading(false);
+        turnstile.reset();
 
         if (!result.success) {
             setError(result.error);
-            if (mode === 'signup') turnstile.reset();
             return;
         }
         if (mode === 'reset') {
@@ -112,7 +115,7 @@ export default function AuthModal({ auth, onClose }) {
                     </button>
                 )}
 
-                {mode === 'signup' && <div ref={turnstile.containerRef} style={{ margin: '0.5rem 0' }} />}
+                <div ref={turnstile.containerRef} style={{ margin: '0.5rem 0' }} />
 
                 {error && <div className="form-error" role="alert">{error}</div>}
                 {successMsg && <div className="form-success-msg" role="status">{successMsg}</div>}
@@ -121,7 +124,7 @@ export default function AuthModal({ auth, onClose }) {
                     type="submit"
                     className="btn btn-primary"
                     style={{ width: '100%', marginTop: '1rem' }}
-                    disabled={loading || (mode === 'signup' && !turnstile.token)}
+                    disabled={loading || !turnstile.token}
                 >
                     {loading
                         ? 'Processing...'

@@ -7,7 +7,8 @@ on:
     - cron: '0 9 * * 1,4'   # Mondays and Thursdays, 09:00 UTC
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  actions: write   # needed to re-enable this workflow (see last step)
 
 jobs:
   ping:
@@ -28,3 +29,10 @@ jobs:
             -H "Authorization: Bearer $SUPABASE_ANON_KEY")
           echo "HTTP $code"
           case "$code" in 2*) ;; *) exit 1 ;; esac
+
+      # GitHub disables scheduled workflows in public repos after 60 days
+      # without commits. Re-enabling from inside the run resets that timer.
+      - name: Reset GitHub's 60-day inactivity timer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/supabase-keepalive.yml/enable"

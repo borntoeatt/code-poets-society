@@ -42,8 +42,15 @@ export function useAuth() {
         return error ? { success: false, error: error.message } : { success: true };
     };
 
-    const login = async (email, password) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // Supabase "Captcha protection" is project-wide: once enabled it gates
+    // sign-up, password login and password reset alike, so every call sends
+    // the Turnstile token. When protection is off the token is simply ignored.
+    const login = async ({ email, password, captchaToken }) => {
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+            options: { captchaToken },
+        });
         return error ? { success: false, error: error.message } : { success: true };
     };
 
@@ -52,9 +59,10 @@ export function useAuth() {
         setCurrentUser(null);
     };
 
-    const resetPassword = async (email) => {
+    const resetPassword = async ({ email, captchaToken }) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: window.location.origin,
+            captchaToken,
         });
         return error ? { success: false, error: error.message } : { success: true };
     };

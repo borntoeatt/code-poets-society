@@ -112,8 +112,10 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
             title: form.title.trim(),
             description: form.description.trim(),
             tech_stack: parseTechStack(form.tech_stack),
-            github_url: form.github_url.trim() || null,
-            demo_url: form.demo_url.trim() || null,
+            // Store the normalised form (lower-cased scheme/host) that validation
+            // checked, so the case-sensitive DB CHECK constraints see the same string.
+            github_url: safeHttpUrl(form.github_url.trim()),
+            demo_url: safeHttpUrl(form.demo_url.trim()),
             author_id: currentUser.id,
             slug: makeSlug(form.title),
             status: 'active',
@@ -301,6 +303,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
 
             {selectedProject && (
                 <ProjectDetailModal
+                    key={selectedProject.id}
                     project={selectedProject}
                     onClose={() => navigate('/projects')}
                     currentUser={currentUser}
