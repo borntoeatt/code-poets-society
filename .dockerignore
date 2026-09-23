@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.github
+k8s
+migrations
+supabase
+*.md
+*.backup
+.env
+.env.*
+.DS_Store
