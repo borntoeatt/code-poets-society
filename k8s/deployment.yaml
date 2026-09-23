@@ -3,10 +3,20 @@ kind: Deployment
 metadata:
   name: code-poets-society
 spec:
-  replicas: 3  # Will be managed by HPA
+  # No `replicas` here on purpose: the HPA (k8s/hpa.yaml, min 3) owns the
+  # count. Committing a number would make every Argo CD sync reset the
+  # Deployment to it mid-scale-up.
   selector:
     matchLabels:
       app: code-poets-society
+  # Bring all new pods up before removing any old one: each image only
+  # carries its own hashed assets, so the mixed old/new window during a
+  # rollout is when a visitor can get a 404 for index-<hash>.js.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 0
   template:
     metadata:
       labels:

@@ -39,6 +39,11 @@ jobs:
     name: Docker image
     needs: check
     runs-on: ubuntu-latest
+    # Serialise runs per branch so two quick merges pin their digests in
+    # order (the newest image last) instead of racing on the same file.
+    concurrency:
+      group: docker-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write   # to commit the new image digest into k8s/deployment.yaml
     steps:
@@ -97,6 +102,11 @@ jobs:
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
+          # Rewrite main's CURRENT copy of the file (not the trigger commit's),
+          # so a newer commit on main can never produce a rebase conflict on
+          # the digest line and a re-run of this job also succeeds.
+          git fetch --depth=1 origin main
+          git checkout -q FETCH_HEAD
           sed -i -E "s|(image: [^@]+)@sha256:[0-9a-f]{64}|\1@${DIGEST}|" k8s/deployment.yaml
           if git diff --quiet -- k8s/deployment.yaml; then
             echo "Digest unchanged; nothing to commit."
@@ -105,5 +115,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "k8s: deploy ${GITHUB_SHA::7} (${DIGEST::19}…)" -- k8s/deployment.yaml
-          git pull --rebase origin main
           git push origin HEAD:main
