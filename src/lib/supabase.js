@@ -1,0 +1,15 @@
+import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config.js';
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Turns a Supabase/PostgREST error into something a person can read.
+export function friendlyError(error, fallback = 'Something went wrong. Please try again.') {
+    if (!error) return fallback;
+    const msg = error.message || '';
+    if (error.code === '23505') return 'That already exists. Try a different value.';
+    if (error.code === '23514') return 'One of the fields is too long or has an invalid format.';
+    if (msg.startsWith('Rate limit exceeded')) return msg;
+    if (msg.includes('Failed to fetch')) return 'Cannot reach the server. Please try again in a moment.';
+    return fallback;
+}
