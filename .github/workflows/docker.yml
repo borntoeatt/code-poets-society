@@ -16,7 +16,10 @@ permissions:
   contents: read
 
 env:
-  IMAGE: ${{ secrets.DOCKER_USERNAME || 'local' }}/code-poets-society
+  # Fixed image name (must match k8s/deployment.yaml). Deliberately NOT
+  # derived from DOCKER_USERNAME, so the login account can change without
+  # silently pushing to a different repository.
+  IMAGE: dporkov/code-poets-society
 
 jobs:
   check:

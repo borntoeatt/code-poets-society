@@ -113,7 +113,7 @@ kubectl -n codepoets rollout status deploy/code-poets-society
 If CI is broken and you need to pin a digest by hand:
 
 ```bash
-docker buildx imagetools inspect borntoeatt/code-poets-society:latest
+docker buildx imagetools inspect dporkov/code-poets-society:latest
 ```
 
 ## Verify a deployment
