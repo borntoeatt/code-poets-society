@@ -33,15 +33,20 @@ export function useTurnstile(enabled = true) {
             });
         };
 
-        // The Turnstile script is loaded async; poll until it's available,
-        // but give up (with a message) if it never arrives.
+        // The Turnstile script is loaded async; poll until it's available.
+        // Stop for good only on a definite load failure (index.html onerror).
+        // After the soft timeout, explain why the button is disabled but keep
+        // polling: on a slow network the script can still arrive.
         const started = Date.now();
         const interval = setInterval(() => {
             if (window.turnstile) {
                 clearInterval(interval);
+                if (!cancelled) setError('');
                 render();
-            } else if (window.__turnstileLoadFailed || Date.now() - started > LOAD_TIMEOUT_MS) {
+            } else if (window.__turnstileLoadFailed) {
                 clearInterval(interval);
+                if (!cancelled) setError(LOAD_FAILED_MSG);
+            } else if (Date.now() - started > LOAD_TIMEOUT_MS) {
                 if (!cancelled) setError(LOAD_FAILED_MSG);
             }
         }, 100);

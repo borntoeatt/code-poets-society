@@ -24,6 +24,15 @@ function readAuthErrorFromUrl() {
     return params.get('error_description') || 'That sign-in link could not be used.';
 }
 
+// Reading clears the fragment, so a second read would return null. Memoise
+// per page load: React 18 StrictMode renders twice on mount and keeps the
+// second render's state, and both must see the same message.
+let urlAuthError;
+function takeAuthErrorFromUrl() {
+    if (urlAuthError === undefined) urlAuthError = readAuthErrorFromUrl();
+    return urlAuthError;
+}
+
 // Single source of truth for auth state. Call this once in <App>; pass the
 // result down rather than calling it again in child components.
 export function useAuth() {
@@ -31,11 +40,9 @@ export function useAuth() {
     const [loading, setLoading] = useState(true);
     // Set when the user lands here from a password-reset email.
     const [recovering, setRecovering] = useState(false);
-    const [authError, setAuthError] = useState(null);
+    const [authError, setAuthError] = useState(takeAuthErrorFromUrl);
 
     useEffect(() => {
-        setAuthError(readAuthErrorFromUrl());
-
         supabase.auth.getSession().then(({ data: { session } }) => {
             setCurrentUser(toUser(session));
             setLoading(false);

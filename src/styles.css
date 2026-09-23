@@ -14,7 +14,7 @@
     /* Text/borders placed ON the green or error surfaces. White passes on the
        darker light-theme accents; the bright dark-theme accents need ink. */
     --on-accent: #ffffff;
-    --on-accent-bg: rgba(255, 255, 255, 0.1);
+    --on-accent-bg: rgba(0, 0, 0, 0.1);
 }
 
 [data-theme="dark"] {
@@ -737,7 +737,8 @@ input:checked + .slider:before {
 
 .newsletter-input::placeholder {
     color: var(--on-accent);
-    opacity: 0.75;
+    opacity: 0.95;
+    font-style: italic;
 }
 
 .newsletter-input:focus {

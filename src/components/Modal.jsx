@@ -41,7 +41,13 @@ export default function Modal({ title, titleId, onClose, children, maxWidth }) {
             if (items.length === 0) return;
             const first = items[0];
             const last = items[items.length - 1];
-            if (e.shiftKey && document.activeElement === first) {
+            // Focus can end up outside (e.g. on <body> after the element that
+            // had it was removed); pull it back in instead of letting Tab
+            // walk the page behind the overlay.
+            if (!dialog.contains(document.activeElement)) {
+                e.preventDefault();
+                (e.shiftKey ? last : first).focus();
+            } else if (e.shiftKey && document.activeElement === first) {
                 e.preventDefault();
                 last.focus();
             } else if (!e.shiftKey && document.activeElement === last) {
@@ -57,10 +63,16 @@ export default function Modal({ title, titleId, onClose, children, maxWidth }) {
             if (i !== -1) openDialogs.splice(i, 1);
             if (openDialogs.length === 0) document.body.style.overflow = '';
             const active = document.activeElement;
-            const focusInsideAnotherDialog = openDialogs.some((d) => d?.contains(active));
-            if (opener instanceof HTMLElement && opener.isConnected && !focusInsideAnotherDialog) {
+            if (openDialogs.some((d) => d?.contains(active))) return;
+            if (opener instanceof HTMLElement && opener.isConnected) {
                 opener.focus();
+                return;
             }
+            // The opener is gone (e.g. "Sign In" inside a project modal is
+            // replaced by the comment form after login): keep focus inside
+            // whichever dialog is still open.
+            const top = openDialogs[openDialogs.length - 1];
+            if (top) (top.querySelector(FOCUSABLE) || top).focus();
         };
     }, []);
 
@@ -83,6 +95,7 @@ export default function Modal({ title, titleId, onClose, children, maxWidth }) {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
+                tabIndex={-1}
             >
                 <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
                 {title && <h2 className="modal-title" id={titleId}>{title}</h2>}

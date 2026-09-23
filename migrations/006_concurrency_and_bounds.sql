@@ -120,9 +120,10 @@ BEGIN
         base := 'poet';
     END IF;
 
-    -- Serialise concurrent sign-ups that slugify to the same base so the
-    -- EXISTS check below cannot race the UNIQUE constraint.
-    PERFORM pg_advisory_xact_lock(hashtext('profiles.username:' || base));
+    -- Serialise ALL username picks (one global key): a per-base key still lets
+    -- base "ada" and base "ada-1" race to the same generated "ada-1".
+    -- Sign-ups are rare, so the cost is nil.
+    PERFORM pg_advisory_xact_lock(hashtext('profiles.username'));
 
     candidate := base;
     WHILE EXISTS (SELECT 1 FROM public.profiles WHERE username = candidate) LOOP
@@ -166,6 +167,10 @@ $$;
 UPDATE public.projects p
 SET stars_count = (SELECT count(*) FROM public.project_stars s WHERE s.project_id = p.id);
 
+-- The trigger now does stars_count + 1, and NULL + 1 stays NULL forever, so
+-- the column must never be NULL (the repair above just filled every row).
+ALTER TABLE public.projects ALTER COLUMN stars_count SET NOT NULL;
+
 -- =============================================
 -- 4. BOUNDED PROJECT COLUMNS
 -- =============================================
@@ -180,6 +185,14 @@ UPDATE public.projects SET tech_stack = ARRAY['Other']
 UPDATE public.projects SET tech_stack = tech_stack[1:20] WHERE cardinality(tech_stack) > 20;
 UPDATE public.projects SET looking_for = looking_for[1:20]
     WHERE looking_for IS NOT NULL AND cardinality(looking_for) > 20;
+UPDATE public.projects SET tech_stack = ARRAY['Other']
+    WHERE length(array_to_string(tech_stack, '')) > 1000;
+UPDATE public.projects SET looking_for = NULL
+    WHERE looking_for IS NOT NULL AND length(array_to_string(looking_for, '')) > 1000;
+-- The pre-rewrite app built slugs from the full title (up to 150 chars).
+-- Shorten to 80, keep the 002 format check (no trailing '-') and uniqueness.
+UPDATE public.projects SET slug = rtrim(left(slug, 73), '-') || '-' || substr(md5(id::text), 1, 6)
+    WHERE length(slug) > 80;
 
 ALTER TABLE public.projects DROP CONSTRAINT IF EXISTS projects_long_description_length;
 ALTER TABLE public.projects

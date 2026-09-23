@@ -5,7 +5,11 @@ metadata:
 spec:
   # No `replicas` here on purpose: the HPA (k8s/hpa.yaml, min 3) owns the
   # count. Committing a number would make every Argo CD sync reset the
-  # Deployment to it mid-scale-up.
+  # Deployment to it mid-scale-up. Argo applies with ServerSideApply, and the
+  # HPA's scale subresource co-owns spec.replicas, so dropping the field keeps
+  # the live count (verified with a server-side dry run before removing it).
+  # If Argo is ever switched to client-side apply, add ignoreDifferences on
+  # /spec/replicas to the Application first (see SETUP-GUIDE.md).
   selector:
     matchLabels:
       app: code-poets-society

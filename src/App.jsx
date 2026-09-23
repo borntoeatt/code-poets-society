@@ -33,6 +33,9 @@ export default function App() {
             firstRender.current = false;
             return;
         }
+        // A dialog that survives the route change (e.g. the auth modal while
+        // the user presses Back) keeps focus; don't pull it out from under it.
+        if (document.querySelector('[role="dialog"]')) return;
         mainRef.current?.focus();
     }, [route.page]);
 

@@ -195,7 +195,8 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
     const selectedProject = selectedId ? allProjects.find((p) => p.id === selectedId) : null;
     // A shared link to a deleted project, or to a GitHub pick this browser
     // didn't fetch (the picks are a random topic per visitor), resolves to nothing.
-    const notFound = Boolean(selectedId) && !loading && githubSettled && !selectedProject;
+    // Only when the list actually loaded: if it failed, the load error says so.
+    const notFound = Boolean(selectedId) && !loading && !loadError && githubSettled && !selectedProject;
     const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
 
     return (
