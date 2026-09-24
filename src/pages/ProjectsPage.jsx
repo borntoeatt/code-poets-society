@@ -1,16 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase, friendlyError } from '../lib/supabase.js';
 import { navigate } from '../hooks/useHashRoute.js';
-import { makeSlug, parseTechStack, safeHttpUrl } from '../lib/utils.js';
-import { validateProjectForm } from '../lib/validation.js';
-import { LIMITS } from '../config.js';
+import { makeSlug } from '../lib/utils.js';
+import { EMPTY_PROJECT_FORM, formValuesToRow } from '../lib/projectForm.js';
 import ProjectDetailModal from '../components/ProjectDetailModal.jsx';
+import ProjectForm from '../components/ProjectForm.jsx';
 
 const GITHUB_CACHE_KEY = 'github_projects_cache';
 const GITHUB_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 const GITHUB_TOPICS = ['javascript', 'python', 'rust', 'web-development'];
 const PAGE = 12;
-const EMPTY_FORM = { title: '', description: '', tech_stack: '', github_url: '', demo_url: '' };
 
 async function fetchGithubProjects() {
     try {
@@ -41,9 +40,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
     const [showSubmitForm, setShowSubmitForm] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
-    const [submitError, setSubmitError] = useState('');
-    const [form, setForm] = useState(EMPTY_FORM);
+    const [mineOnly, setMineOnly] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [filterLanguage, setFilterLanguage] = useState('all');
@@ -55,14 +52,16 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    const loadProjects = async () => {
-        setLoading(true);
+    // `quiet` refreshes in place (after an edit/delete) instead of swapping
+    // the grid for the loading placeholder.
+    const loadProjects = async ({ quiet = false } = {}) => {
+        if (!quiet) setLoading(true);
         setLoadError('');
         // Explicit columns: the list never depends on large optional fields
         // (long_description etc.), so one oversized row can't slow everyone.
         const { data, error } = await supabase
             .from('projects')
-            .select('id, title, description, tech_stack, github_url, demo_url, stars_count, status, created_at, profiles!projects_author_id_fkey(username)')
+            .select('id, title, description, tech_stack, github_url, demo_url, stars_count, status, created_at, author_id, profiles!projects_author_id_fkey(username)')
             .order('created_at', { ascending: false });
         if (error) {
             console.error('Failed to load projects:', error);
@@ -84,43 +83,31 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setSubmitError('');
+    const submitProject = async (values) => {
         if (!currentUser) {
             onLogin();
-            return;
+            return 'Please log in to submit a project.';
         }
-        const validation = validateProjectForm(form);
-        if (validation) {
-            setSubmitError(validation);
-            return;
-        }
-
-        setSubmitting(true);
         const { error } = await supabase.from('projects').insert([{
-            title: form.title.trim(),
-            description: form.description.trim(),
-            tech_stack: parseTechStack(form.tech_stack, LIMITS.techStackMax),
-            // Store the normalised form (lower-cased scheme/host) that validation
-            // checked, so the case-sensitive DB CHECK constraints see the same string.
-            github_url: safeHttpUrl(form.github_url.trim()),
-            demo_url: safeHttpUrl(form.demo_url.trim()),
+            ...formValuesToRow(values),
             author_id: currentUser.id,
-            slug: makeSlug(form.title),
+            slug: makeSlug(values.title),
             status: 'active',
         }]);
-        setSubmitting(false);
-
         if (error) {
             console.error('Failed to save project:', error);
-            setSubmitError(friendlyError(error, 'Failed to submit project. Please try again.'));
-            return;
+            return friendlyError(error, 'Failed to submit project. Please try again.');
         }
-        setForm(EMPTY_FORM);
         setShowSubmitForm(false);
         await loadProjects();
+        return '';
     };
+
+    const refreshProjects = useCallback(() => loadProjects({ quiet: true }), []); // eslint-disable-line react-hooks/exhaustive-deps
+    const handleProjectDeleted = useCallback(() => {
+        navigate('/projects');
+        loadProjects({ quiet: true });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const allProjects = useMemo(() => [
         ...projects.map((p) => ({
@@ -132,6 +119,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
             githubUrl: p.github_url,
             demoUrl: p.demo_url,
             author: p.profiles?.username || 'Unknown',
+            authorId: p.author_id,
             stars: p.stars_count || 0,
             isSupabase: true,
         })),
@@ -148,9 +136,13 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
         })),
     ], [projects, githubProjects]);
 
+    // "My projects" only applies while logged in (logging out shows everything).
+    const showMine = mineOnly && Boolean(currentUser);
+
     const filteredProjects = useMemo(() => {
         const q = debouncedSearch.toLowerCase();
         return allProjects
+            .filter((p) => !showMine || p.authorId === currentUser.id)
             .filter((p) => {
                 const matchesSearch = p.title.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q);
                 const matchesLanguage = filterLanguage === 'all' || p.language?.toLowerCase() === filterLanguage.toLowerCase();
@@ -161,7 +153,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                 if (sortBy === 'az') return a.title.localeCompare(b.title);
                 return 0; // 'newest': keep created_at desc order from the query
             });
-    }, [allProjects, debouncedSearch, filterLanguage, sortBy]);
+    }, [allProjects, debouncedSearch, filterLanguage, sortBy, showMine, currentUser]);
 
     const languages = useMemo(
         () => ['all', ...new Set(allProjects.map((p) => p.language).filter(Boolean))],
@@ -173,7 +165,6 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
     // didn't fetch (the picks are a random topic per visitor), resolves to nothing.
     // Only when the list actually loaded: if it failed, the load error says so.
     const notFound = Boolean(selectedId) && !loading && !loadError && githubSettled && !selectedProject;
-    const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
 
     return (
         <div className="container">
@@ -189,38 +180,13 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
             {showSubmitForm && (
                 <div className="card">
                     <h2 className="card-title">Submit Your Project</h2>
-                    {submitError && <div className="form-error" role="alert">{submitError}</div>}
-                    <form onSubmit={handleSubmit}>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="project-title">Project Title</label>
-                            <input id="project-title" type="text" className="form-input" value={form.title}
-                                onChange={update('title')} minLength={LIMITS.titleMin} maxLength={LIMITS.titleMax} required />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="project-description">Description</label>
-                            <textarea id="project-description" className="form-textarea" value={form.description}
-                                onChange={update('description')} maxLength={LIMITS.descriptionMax} required />
-                            <div className="form-hint">{form.description.length}/{LIMITS.descriptionMax}</div>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="project-tech">Tech Stack (comma-separated)</label>
-                            <input id="project-tech" type="text" className="form-input" placeholder="e.g., JavaScript, React, Node.js"
-                                value={form.tech_stack} onChange={update('tech_stack')} required />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="project-github">GitHub URL (optional)</label>
-                            <input id="project-github" type="url" className="form-input" placeholder="https://github.com/username/repo"
-                                value={form.github_url} onChange={update('github_url')} />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="project-demo">Demo URL (optional)</label>
-                            <input id="project-demo" type="url" className="form-input" placeholder="https://demo.example.com"
-                                value={form.demo_url} onChange={update('demo_url')} />
-                        </div>
-                        <button type="submit" className="btn btn-primary" disabled={submitting}>
-                            {submitting ? 'Submitting...' : 'Submit Project'}
-                        </button>
-                    </form>
+                    <ProjectForm
+                        initialValues={EMPTY_PROJECT_FORM}
+                        idPrefix="project"
+                        submitLabel="Submit Project"
+                        submittingLabel="Submitting..."
+                        onSubmit={submitProject}
+                    />
                 </div>
             )}
 
@@ -241,6 +207,16 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                         <option key={lang} value={lang}>{lang === 'all' ? 'All Languages' : lang}</option>
                     ))}
                 </select>
+                {currentUser && (
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-small toggle-button"
+                        aria-pressed={showMine}
+                        onClick={() => setMineOnly((m) => !m)}
+                    >
+                        My projects
+                    </button>
+                )}
             </div>
 
             {loadError && <div className="form-error" role="alert" style={{ marginBottom: '1rem' }}>{loadError}</div>}
@@ -256,7 +232,11 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
             ) : filteredProjects.length === 0 ? (
                 <div className="empty-state">
                     <div className="empty-state-icon">📦</div>
-                    <p>No projects found. Be the first to submit one!</p>
+                    <p>
+                        {showMine && !debouncedSearch && filterLanguage === 'all'
+                            ? "You haven't submitted any projects yet."
+                            : 'No projects found. Be the first to submit one!'}
+                    </p>
                 </div>
             ) : (
                 <div className="projects-grid">
@@ -306,6 +286,8 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                     onClose={() => navigate('/projects')}
                     currentUser={currentUser}
                     onLogin={onLogin}
+                    onUpdated={refreshProjects}
+                    onDeleted={handleProjectDeleted}
                 />
             )}
         </div>
