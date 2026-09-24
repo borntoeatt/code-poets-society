@@ -1,0 +1,31 @@
+# Weekly dependency update PRs, targeting `dev` to match the dev -> main flow.
+# Each PR runs the normal CI (lint, tests, audit, build, Trivy) before you merge.
+version: 2
+updates:
+  # Keeps the SHA-pinned actions (and their "# vX.Y.Z" comments) current.
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      # Minor/patch updates in one PR; majors arrive individually so they
+      # can be reviewed on their own.
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # nginx-unprivileged and node base images in the Dockerfile.
+  - package-ecosystem: docker
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly

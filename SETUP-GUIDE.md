@@ -8,10 +8,17 @@ container on Kubernetes.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev          # http://localhost:5173
 npm run lint
-npm run build      # outputs dist/
+npm test             # unit + DB-contract tests (vitest)
+npm run build        # outputs dist/
+npm run check:edge   # type-check + lint the edge function (Deno via npx)
 ```
+
+`src/lib/dbConstraints.test.js` reads the CHECK constraints straight out of
+`migrations/*.sql` and asserts the client-side limits, slug generator and URL
+validation agree with them. If you change a constraint, that test tells you
+which client code to update (and vice versa).
 
 Public config (Supabase URL, anon key, Turnstile site key) lives in
 `src/config.js`. To point at another project, copy `.env.example` to `.env`
@@ -66,6 +73,11 @@ supabase secrets set TURNSTILE_SECRET_KEY=<turnstile secret>
 supabase functions deploy verify-turnstile --no-verify-jwt
 ```
 
+Its dependencies are declared in `supabase/functions/verify-turnstile/deno.json`
+and locked in `deno.lock`. After changing an import, run
+`cd supabase/functions/verify-turnstile && npx -y deno install` to update the
+lock (CI runs `deno check --frozen`, which fails on an out-of-date lock).
+
 If you host on a different domain, add it to `ALLOWED_ORIGINS` in the
 function first.
 
@@ -96,11 +108,27 @@ non-root bind with the safe `net.ipv4.ip_unprivileged_port_start=0` sysctl.
 Security headers live in `nginx-security-headers.conf` and are included in
 every location block.
 
+### CI
+
+- `docker.yml`: lint, tests, `npm audit` (production deps, fails on
+  high/critical), npm registry signature verification, build, then the image
+  build, Trivy scan and (on `main`) push + digest pin.
+- `edge-function.yml`: `deno check --frozen` and `deno lint` for the edge
+  function, only when `supabase/**` changes.
+- Every action is pinned to a full commit SHA with the release in a comment.
+  Dependabot (`.github/dependabot.yml`) opens weekly PRs **against `dev`**
+  for actions, npm packages and the Docker base images; each runs the full CI.
+
+Branch protection on `main` is deliberately not configured: the pipeline's
+bot pushes the digest commit directly to `main`, which a "require pull
+request" rule would block. If you add protection, use a ruleset with a
+bypass for GitHub Actions.
+
 ### Deploy flow (Argo CD auto-sync from `k8s/` on `main`)
 
-1. Merge to `main`. CI (`.github/workflows/docker.yml`) lints, builds the
-   image once, scans it with Trivy (fails on CRITICAL/HIGH), pushes that
-   exact image to Docker Hub tagged `latest` and `<sha>`.
+1. Merge to `main`. CI (`.github/workflows/docker.yml`) lints, tests, audits,
+   builds the image once, scans it with Trivy (fails on CRITICAL/HIGH), pushes
+   that exact image to Docker Hub tagged `latest` and `<sha>`.
 2. CI then rewrites the digest in `k8s/deployment.yaml` and commits it to
    `main` as `github-actions[bot]`. It skips this when a newer
    image-producing commit is already on `main` (that commit's run pins
