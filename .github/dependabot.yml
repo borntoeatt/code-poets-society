@@ -23,9 +23,25 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
 
+  # The edge function's deno.json (supabase-js), so it doesn't fall behind the
+  # frontend. If the PR fails `deno check --frozen`, regenerate deno.lock with
+  # Deno 2.1.4 (see SETUP-GUIDE.md): the edge runtime only reads lockfile v4.
+  - package-ecosystem: deno
+    directory: /supabase/functions/verify-turnstile
+    target-branch: dev
+    schedule:
+      interval: weekly
+
   # nginx-unprivileged and node base images in the Dockerfile.
   - package-ecosystem: docker
     directory: /
     target-branch: dev
     schedule:
       interval: weekly
+    ignore:
+      # The image tracks nginx *stable* (even minor). Odd minors are mainline.
+      - dependency-name: 'nginxinc/nginx-unprivileged'
+        versions: ['>= 1.31, < 1.32', '>= 1.33, < 1.34', '>= 1.35, < 1.36', '>= 1.37, < 1.38']
+      # Node majors must move together with node-version in docker.yml.
+      - dependency-name: 'node'
+        update-types: ['version-update:semver-major']

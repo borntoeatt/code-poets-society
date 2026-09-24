@@ -2,35 +2,53 @@
 // CHECK constraints in the migrations. The numbers and regexes are read from
 // the SQL files themselves, so changing a constraint without updating the
 // client (or vice versa) fails here instead of as a generic 23514 for users.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { LIMITS } from '../config.js';
 import { isGithubRepoUrl, makeSlug, parseTechStack, safeHttpUrl } from './utils.js';
 import { validateProjectForm } from './validation.js';
 
-const sql = (name) => readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8');
-const m002 = sql('002_rls_and_constraints.sql');
-const m004 = sql('004_lock_down_rls.sql');
-const m006 = sql('006_concurrency_and_bounds.sql');
+// The whole schema history in apply order: base schema, then every migration
+// sorted by filename. A later migration that redefines a constraint wins.
+const migrationsDir = new URL('../../migrations/', import.meta.url);
+const allSql = [
+    readFileSync(new URL('../../supabase-schema.sql', import.meta.url), 'utf8'),
+    ...readdirSync(migrationsDir)
+        .filter((f) => f.endsWith('.sql'))
+        .sort()
+        .map((f) => readFileSync(new URL(f, migrationsDir), 'utf8')),
+].join('\n');
 
-function match(text, re, what) {
-    const m = text.match(re);
-    if (!m) throw new Error(`Could not find ${what} in the migrations; update this test with the constraint.`);
+// Body of the LAST `ADD CONSTRAINT <name> CHECK (...)` in history, failing if
+// it is missing or was dropped afterwards without being re-added.
+function latestCheck(name) {
+    const adds = [...allSql.matchAll(new RegExp(`ADD CONSTRAINT ${name}\\s+CHECK\\s*\\(([\\s\\S]*?)\\);`, 'g'))];
+    if (adds.length === 0) throw new Error(`No CHECK constraint named ${name} in the migrations; update this test.`);
+    const last = adds[adds.length - 1];
+    const after = allSql.slice(last.index + last[0].length);
+    if (new RegExp(`DROP CONSTRAINT (IF EXISTS )?${name}\\b`).test(after)) {
+        throw new Error(`${name} is dropped after its last definition; update this test.`);
+    }
+    return last[1];
+}
+
+function parse(name, re) {
+    const m = latestCheck(name).match(re);
+    if (!m) throw new Error(`${name} no longer has the expected shape; update this test.`);
     return m;
 }
 
-const title = match(m002, /length\(title\) >= (\d+) AND length\(title\) <= (\d+)/, 'the title length CHECK');
-const description = match(m002, /length\(description\) <= (\d+)/, 'the description length CHECK');
-const comment = match(m002, /length\(content\) >= 1 AND length\(content\) <= (\d+)/, 'the comment length CHECK');
-const slugFormat = new RegExp(match(m002, /slug ~ '([^']+)'/, 'the slug format CHECK')[1]);
-const slugMax = Number(match(m006, /length\(slug\) <= (\d+)/, 'the slug length CHECK')[1]);
-const tech = match(
-    m006,
+const title = parse('projects_title_length', /length\(title\) >= (\d+) AND length\(title\) <= (\d+)/);
+const description = parse('projects_description_length', /length\(description\) <= (\d+)/);
+const comment = parse('comments_content_length', /length\(content\) >= 1 AND length\(content\) <= (\d+)/);
+const slugFormat = new RegExp(parse('projects_slug_format', /slug ~ '([^']+)'/)[1]);
+const slugMax = Number(parse('projects_slug_length', /length\(slug\) <= (\d+)/)[1]);
+const tech = parse(
+    'projects_tech_stack_bounds',
     /cardinality\(tech_stack\) BETWEEN 1 AND (\d+) AND length\(array_to_string\(tech_stack, ''\)\) <= (\d+)/,
-    'the tech_stack bounds CHECK',
 );
-const githubRe = new RegExp(match(m004, /github_url IS NULL OR github_url ~ '([^']+)'/, 'the github_url CHECK')[1]);
-const demoRe = new RegExp(match(m004, /demo_url IS NULL OR demo_url ~ '([^']+)'/, 'the demo_url CHECK')[1]);
+const githubRe = new RegExp(parse('projects_github_url_format', /github_url ~ '([^']+)'/)[1]);
+const demoRe = new RegExp(parse('projects_demo_url_format', /demo_url ~ '([^']+)'/)[1]);
 
 describe('LIMITS mirror the database CHECK constraints', () => {
     it('title length', () => {

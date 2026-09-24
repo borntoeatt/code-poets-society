@@ -10,7 +10,7 @@
     "lint": "eslint src",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:edge": "cd supabase/functions/verify-turnstile && npx -y deno check --frozen index.ts && npx -y deno lint"
+    "check:edge": "cd supabase/functions/verify-turnstile && npx -y deno@2.1.4 check --frozen index.ts && npx -y deno@2.1.4 lint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",

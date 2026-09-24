@@ -74,9 +74,17 @@ supabase functions deploy verify-turnstile --no-verify-jwt
 ```
 
 Its dependencies are declared in `supabase/functions/verify-turnstile/deno.json`
-and locked in `deno.lock`. After changing an import, run
-`cd supabase/functions/verify-turnstile && npx -y deno install` to update the
-lock (CI runs `deno check --frozen`, which fails on an out-of-date lock).
+and locked in `deno.lock`. After changing an import, update the lock with the
+**same Deno version as Supabase's edge runtime (2.1.4)**:
+
+```bash
+cd supabase/functions/verify-turnstile && npx -y deno@2.1.4 install
+```
+
+A newer Deno writes lockfile v5, which the edge runtime can't read, and the
+deploy fails (supabase/edge-runtime#615). CI and `npm run check:edge` run
+`deno check --frozen` under 2.1.4, so a v5 or out-of-date lock fails there
+first. Move all three places to a newer Deno only once edge-runtime does.
 
 If you host on a different domain, add it to `ALLOWED_ORIGINS` in the
 function first.
@@ -117,7 +125,14 @@ every location block.
   function, only when `supabase/**` changes.
 - Every action is pinned to a full commit SHA with the release in a comment.
   Dependabot (`.github/dependabot.yml`) opens weekly PRs **against `dev`**
-  for actions, npm packages and the Docker base images; each runs the full CI.
+  for actions, npm packages, the edge function's `deno.json` and the Docker
+  base images; each runs the full CI.
+  - It won't propose nginx *mainline* (odd minor) tags or Node majors: the
+    image tracks nginx stable and Node must match CI's `node-version`. Move
+    to the next stable nginx line (even minor) or a new Node major by hand.
+  - If a `deno` PR fails `deno check --frozen`, Dependabot regenerated the
+    lock with a newer Deno; re-run `npx -y deno@2.1.4 install` in the
+    function directory and push to the PR branch.
 
 Branch protection on `main` is deliberately not configured: the pipeline's
 bot pushes the digest commit directly to `main`, which a "require pull
