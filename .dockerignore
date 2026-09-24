@@ -10,3 +10,4 @@ supabase
 .env
 .env.*
 .DS_Store
+**/*.test.js

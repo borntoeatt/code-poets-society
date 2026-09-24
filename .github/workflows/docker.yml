@@ -1,16 +1,30 @@
 name: Build and Push Docker Image
 
+# Actions are pinned to full commit SHAs (a tag can be moved to malicious code;
+# a SHA cannot). The trailing comment is the release it corresponds to;
+# Dependabot (.github/dependabot.yml) keeps both up to date.
+
 on:
   push:
     branches: [main, dev]
+    # Changes that cannot affect the image. KEEP IN SYNC with the pathspec in
+    # the "Pin new digest" step below.
     paths-ignore:
       - 'k8s/**'      # manifest-only changes (incl. the digest bump below) need no image
       - '**.md'
+      - 'supabase/**' # edge function: checked by edge-function.yml, deployed separately
+      - '.github/dependabot.yml'
+      - '.github/workflows/edge-function.yml'
+      - '.github/workflows/supabase-keepalive.yml'
   pull_request:
     branches: [main, dev]
     paths-ignore:
       - 'k8s/**'
       - '**.md'
+      - 'supabase/**'
+      - '.github/dependabot.yml'
+      - '.github/workflows/edge-function.yml'
+      - '.github/workflows/supabase-keepalive.yml'
 
 permissions:
   contents: read
@@ -23,16 +37,25 @@ env:
 
 jobs:
   check:
-    name: Lint and build
+    name: Lint, test and build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - name: Unit and contract tests
+        run: npm test
+      # Production dependencies only: dev tooling never ships in the image.
+      - name: Audit production dependencies (fails on high/critical)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Verify registry signatures and provenance
+        run: npm audit signatures
       - run: npm run build
 
   docker:
@@ -50,17 +73,17 @@ jobs:
       contents: write   # to commit the new image digest into k8s/deployment.yaml
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       # Build ONCE into the local daemon. The exact image that is scanned below
       # is the one that gets pushed — no rebuild between scan and push.
       # The runtime stage is excluded from the layer cache so `apk upgrade`
       # really runs on every build instead of replaying a stale cached layer.
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           load: true
@@ -70,7 +93,7 @@ jobs:
           no-cache-filters: runtime
 
       - name: Scan image (fails on CRITICAL/HIGH)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.IMAGE }}:${{ github.sha }}
           format: table
@@ -80,7 +103,7 @@ jobs:
 
       - name: Login to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -111,10 +134,15 @@ jobs:
             # shallow at GITHUB_SHA, so this only pulls the newer commits).
             git fetch -q origin main
             # If main has moved on with an image-producing change (anything
-            # outside k8s/ and *.md, mirroring paths-ignore above), that
-            # commit's own run pins its newer image. Pinning ours now would
-            # roll production back, e.g. on a re-run of an old failed run.
-            if [ -n "$(git log --format=%H "$GITHUB_SHA..FETCH_HEAD" -- . ':!k8s' ':!*.md')" ]; then
+            # not in paths-ignore above), that commit's own run pins its newer
+            # image. Pinning ours now would roll production back, e.g. on a
+            # re-run of an old failed run.
+            newer=$(git log --format=%H "$GITHUB_SHA..FETCH_HEAD" -- . \
+              ':!k8s' ':!*.md' ':!supabase' \
+              ':!.github/dependabot.yml' \
+              ':!.github/workflows/edge-function.yml' \
+              ':!.github/workflows/supabase-keepalive.yml')
+            if [ -n "$newer" ]; then
               echo "A newer image-producing commit is on main; its run pins the digest. Skipping."
               exit 0
             fi

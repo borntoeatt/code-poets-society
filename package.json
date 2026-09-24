@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:edge": "cd supabase/functions/verify-turnstile && npx -y deno@2.1.4 check --frozen index.ts && npx -y deno@2.1.4 lint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",
@@ -20,6 +23,7 @@
     "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "globals": "^15.0.0",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "vitest": "^3.2.7"
   }
 }

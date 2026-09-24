@@ -1,0 +1,45 @@
+name: Edge function checks
+
+# The verify-turnstile function holds the service-role key and is the only
+# server-side code in the repo, so it gets its own type-check and lint.
+# It is deployed with the Supabase CLI (see SETUP-GUIDE.md), not by CI.
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/edge-function.yml'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/edge-function.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deno:
+    name: Deno check and lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: supabase/functions/verify-turnstile
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          # MUST match the Deno inside Supabase's edge runtime, not "latest":
+          # edge-runtime is built on Deno 2.1.4 and only reads lockfile v4.
+          # A newer Deno writes v5, which passes here but fails on deploy
+          # (supabase/edge-runtime#615). Bump together with package.json's
+          # check:edge once edge-runtime moves to Deno >= 2.3.
+          deno-version: v2.1.4
+      # --frozen fails if deno.lock would change, i.e. if the resolved
+      # dependency tree differs from the one that was reviewed and committed.
+      # Under 2.1.4 it also fails on a v5 lock the runtime couldn't read.
+      - run: deno check --frozen index.ts
+      - run: deno lint
