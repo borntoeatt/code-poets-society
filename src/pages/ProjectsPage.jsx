@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase, friendlyError } from '../lib/supabase.js';
 import { navigate } from '../hooks/useHashRoute.js';
-import { isGithubRepoUrl, makeSlug, parseTechStack, safeHttpUrl } from '../lib/utils.js';
+import { makeSlug, parseTechStack, safeHttpUrl } from '../lib/utils.js';
+import { validateProjectForm } from '../lib/validation.js';
 import { LIMITS } from '../config.js';
 import ProjectDetailModal from '../components/ProjectDetailModal.jsx';
 
@@ -31,31 +32,6 @@ async function fetchGithubProjects() {
         /* storage unavailable */
     }
     return items;
-}
-
-// Postgres length() counts code points; JS .length counts UTF-16 units, so
-// count code points here to agree with the CHECK constraints on emoji input.
-const codePoints = (s) => [...s].length;
-
-export function validateForm(form) {
-    const title = form.title.trim();
-    const description = form.description.trim();
-    if (codePoints(title) < LIMITS.titleMin || codePoints(title) > LIMITS.titleMax) {
-        return `Title must be between ${LIMITS.titleMin} and ${LIMITS.titleMax} characters.`;
-    }
-    if (!description || codePoints(description) > LIMITS.descriptionMax) {
-        return `Description must be between 1 and ${LIMITS.descriptionMax} characters.`;
-    }
-    const tech = parseTechStack(form.tech_stack);
-    if (tech.length === 0) return 'Add at least one technology.';
-    if (codePoints(tech.join('')) > LIMITS.techStackTotalMax) {
-        return `Tech stack is too long (max ${LIMITS.techStackTotalMax} characters in total).`;
-    }
-    if (form.github_url && !isGithubRepoUrl(form.github_url)) {
-        return 'GitHub URL must look like https://github.com/user/repo.';
-    }
-    if (form.demo_url && !safeHttpUrl(form.demo_url)) return 'Demo URL must start with http:// or https://.';
-    return '';
 }
 
 export default function ProjectsPage({ currentUser, onLogin, selectedId, onBackendError }) {
@@ -115,7 +91,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
             onLogin();
             return;
         }
-        const validation = validateForm(form);
+        const validation = validateProjectForm(form);
         if (validation) {
             setSubmitError(validation);
             return;
@@ -125,7 +101,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
         const { error } = await supabase.from('projects').insert([{
             title: form.title.trim(),
             description: form.description.trim(),
-            tech_stack: parseTechStack(form.tech_stack),
+            tech_stack: parseTechStack(form.tech_stack, LIMITS.techStackMax),
             // Store the normalised form (lower-cased scheme/host) that validation
             // checked, so the case-sensitive DB CHECK constraints see the same string.
             github_url: safeHttpUrl(form.github_url.trim()),
