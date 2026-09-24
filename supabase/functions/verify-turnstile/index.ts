@@ -5,7 +5,7 @@
 // Secrets: supabase secrets set TURNSTILE_SECRET_KEY=...
 //          (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically)
 
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 
 const ALLOWED_ORIGINS = new Set([
     'https://codepoetssociety.info',
