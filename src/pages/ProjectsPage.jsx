@@ -57,34 +57,36 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    // `quiet` refreshes in place (after an edit/delete) instead of swapping
-    // the grid for the loading placeholder.
-    const loadProjects = async ({ quiet = false } = {}) => {
-        if (!quiet) setLoading(true);
-        setLoadError('');
-        // Explicit columns: the list never depends on large optional fields
-        // (long_description etc.), so one oversized row can't slow everyone.
-        const { data, error } = await supabase
-            .from('projects')
-            .select(PROJECT_LIST_COLUMNS)
-            .order('created_at', { ascending: false });
+    // Explicit columns: the list never depends on large optional fields
+    // (long_description etc.), so one oversized row can't slow everyone.
+    const fetchProjects = () => supabase
+        .from('projects')
+        .select(PROJECT_LIST_COLUMNS)
+        .order('created_at', { ascending: false });
+
+    const applyProjects = ({ data, error }) => {
         if (error) {
             console.error('Failed to load projects:', error);
             setLoadError(friendlyError(error, 'Could not load community projects.'));
             onBackendError?.();
         } else {
+            setLoadError('');
             setProjects(data || []);
         }
         setLoading(false);
     };
 
+    // Initial load: `loading` starts true, and state is only set when the
+    // requests resolve (never synchronously in the effect body).
     useEffect(() => {
-        loadProjects();
+        let cancelled = false;
+        fetchProjects().then((result) => { if (!cancelled) applyProjects(result); });
         // GitHub picks are decorative; a failure there shouldn't block the page.
         fetchGithubProjects()
-            .then(setGithubProjects)
+            .then((items) => { if (!cancelled) setGithubProjects(items); })
             .catch((err) => console.error('GitHub fetch failed:', err))
-            .finally(() => setGithubSettled(true));
+            .finally(() => { if (!cancelled) setGithubSettled(true); });
+        return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -104,7 +106,8 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
             return friendlyError(error, 'Failed to submit project. Please try again.');
         }
         setShowSubmitForm(false);
-        await loadProjects();
+        setLoading(true);
+        applyProjects(await fetchProjects());
         return '';
     };
 
@@ -128,10 +131,14 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
         if (notice) headingRef.current?.focus();
     }, [notice]);
 
-    // Opening another project clears the status line.
-    useEffect(() => {
+    // Opening another project clears the status line. Adjusted during render
+    // (React's pattern for resetting state when a prop changes), not in an
+    // effect, so there's no extra render with the stale message.
+    const [prevSelectedId, setPrevSelectedId] = useState(selectedId);
+    if (selectedId !== prevSelectedId) {
+        setPrevSelectedId(selectedId);
         if (selectedId && selectedId !== lastDeletedId) setNotice('');
-    }, [selectedId, lastDeletedId]);
+    }
 
     const allProjects = useMemo(() => [
         ...projects.map((p) => ({

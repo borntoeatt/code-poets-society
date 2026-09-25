@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Modal from './Modal.jsx';
 import ProjectForm from './ProjectForm.jsx';
 import { supabase, friendlyError } from '../lib/supabase.js';
@@ -11,7 +11,8 @@ const PAGE = 5;
 
 export default function ProjectDetailModal({ project, onClose, currentUser, onLogin, onUpdated, onDeleted }) {
     const [comments, setComments] = useState([]);
-    const [commentsLoading, setCommentsLoading] = useState(true);
+    // Only community projects have comments to load.
+    const [commentsLoading, setCommentsLoading] = useState(Boolean(project.isSupabase));
     const [newComment, setNewComment] = useState('');
     const [posting, setPosting] = useState(false);
     const [commentError, setCommentError] = useState('');
@@ -38,25 +39,29 @@ export default function ProjectDetailModal({ project, onClose, currentUser, onLo
         wasEditing.current = showEditForm;
     }, [showEditForm]);
 
-    const loadComments = useCallback(async () => {
-        const { data, error } = await supabase
+    // Comments load once per project (the modal is keyed by project id).
+    // State is only set when the request resolves, never synchronously in
+    // the effect body.
+    useEffect(() => {
+        if (!isCommunity) return undefined;
+        let cancelled = false;
+        supabase
             .from('comments')
             .select(COMMENT_SELECT)
             .eq('project_id', project.id)
-            .order('created_at', { ascending: false });
-        if (error) {
-            console.error('Failed to load comments:', error);
-            setCommentError(friendlyError(error, 'Could not load comments.'));
-        } else {
-            setComments(data || []);
-        }
-        setCommentsLoading(false);
-    }, [project.id]);
-
-    useEffect(() => {
-        if (isCommunity) loadComments();
-        else setCommentsLoading(false);
-    }, [isCommunity, loadComments]);
+            .order('created_at', { ascending: false })
+            .then(({ data, error }) => {
+                if (cancelled) return;
+                if (error) {
+                    console.error('Failed to load comments:', error);
+                    setCommentError(friendlyError(error, 'Could not load comments.'));
+                } else {
+                    setComments(data || []);
+                }
+                setCommentsLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, [isCommunity, project.id]);
 
     const requireLogin = () => {
         if (currentUser) return true;

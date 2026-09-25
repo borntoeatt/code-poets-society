@@ -9,11 +9,13 @@ export default function NewsletterSection() {
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState({ text: '', type: '' });
     const [loading, setLoading] = useState(false);
-    const turnstile = useTurnstile(true);
+    // Destructured: reading fields off an object that also holds a ref counts
+    // as a ref read during render for the React Compiler lint rules.
+    const { containerRef: turnstileRef, token: turnstileToken, reset: resetTurnstile, error: turnstileError } = useTurnstile(true);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!turnstile.token) {
+        if (!turnstileToken) {
             setMessage({ text: 'Please complete the CAPTCHA', type: 'error' });
             return;
         }
@@ -28,7 +30,7 @@ export default function NewsletterSection() {
                     Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
                     apikey: SUPABASE_ANON_KEY,
                 },
-                body: JSON.stringify({ token: turnstile.token, email }),
+                body: JSON.stringify({ token: turnstileToken, email }),
             });
             const data = await response.json().catch(() => ({}));
 
@@ -42,7 +44,7 @@ export default function NewsletterSection() {
             console.error('Newsletter error:', error);
             setMessage({ text: 'Network error. Please try again.', type: 'error' });
         } finally {
-            turnstile.reset();
+            resetTurnstile();
             setLoading(false);
         }
     };
@@ -63,9 +65,9 @@ export default function NewsletterSection() {
                     autoComplete="email"
                     required
                 />
-                <div ref={turnstile.containerRef} style={{ margin: '0.5rem 0' }} />
-                {turnstile.error && <div className="newsletter-message" role="alert" style={{ display: 'block', width: '100%' }}>{turnstile.error}</div>}
-                <button type="submit" className="btn btn-primary" disabled={loading || !turnstile.token}>
+                <div ref={turnstileRef} style={{ margin: '0.5rem 0' }} />
+                {turnstileError && <div className="newsletter-message" role="alert" style={{ display: 'block', width: '100%' }}>{turnstileError}</div>}
+                <button type="submit" className="btn btn-primary" disabled={loading || !turnstileToken}>
                     {loading ? 'Subscribing...' : 'Subscribe'}
                 </button>
             </form>
