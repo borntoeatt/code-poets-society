@@ -16,6 +16,10 @@ export default [
         rules: {
             ...reactHooks.configs.recommended.rules,
             'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }],
+            // Catches reading a const before its declaration (a TDZ crash at
+            // render time that neither the build nor the tests notice).
+            // Functions are hoisted, so only variables are checked.
+            'no-use-before-define': ['error', { functions: false, classes: true, variables: true }],
         },
     },
 ];

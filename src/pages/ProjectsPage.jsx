@@ -1,16 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase, friendlyError } from '../lib/supabase.js';
 import { navigate } from '../hooks/useHashRoute.js';
-import { makeSlug, parseTechStack, safeHttpUrl } from '../lib/utils.js';
-import { validateProjectForm } from '../lib/validation.js';
-import { LIMITS } from '../config.js';
+import { makeSlug } from '../lib/utils.js';
+import { EMPTY_PROJECT_FORM, PROJECT_LIST_COLUMNS, formValuesToRow } from '../lib/projectForm.js';
 import ProjectDetailModal from '../components/ProjectDetailModal.jsx';
+import ProjectForm from '../components/ProjectForm.jsx';
 
 const GITHUB_CACHE_KEY = 'github_projects_cache';
 const GITHUB_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 const GITHUB_TOPICS = ['javascript', 'python', 'rust', 'web-development'];
 const PAGE = 12;
-const EMPTY_FORM = { title: '', description: '', tech_stack: '', github_url: '', demo_url: '' };
 
 async function fetchGithubProjects() {
     try {
@@ -41,9 +40,12 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
     const [showSubmitForm, setShowSubmitForm] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
-    const [submitError, setSubmitError] = useState('');
-    const [form, setForm] = useState(EMPTY_FORM);
+    const [mineOnly, setMineOnly] = useState(false);
+    // Status line after an owner action ("X was deleted."), and the id just
+    // deleted so its still-in-the-URL id doesn't flash "not found".
+    const [notice, setNotice] = useState('');
+    const [lastDeletedId, setLastDeletedId] = useState(null);
+    const headingRef = useRef(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [filterLanguage, setFilterLanguage] = useState('all');
@@ -55,14 +57,16 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    const loadProjects = async () => {
-        setLoading(true);
+    // `quiet` refreshes in place (after an edit/delete) instead of swapping
+    // the grid for the loading placeholder.
+    const loadProjects = async ({ quiet = false } = {}) => {
+        if (!quiet) setLoading(true);
         setLoadError('');
         // Explicit columns: the list never depends on large optional fields
         // (long_description etc.), so one oversized row can't slow everyone.
         const { data, error } = await supabase
             .from('projects')
-            .select('id, title, description, tech_stack, github_url, demo_url, stars_count, status, created_at, profiles!projects_author_id_fkey(username)')
+            .select(PROJECT_LIST_COLUMNS)
             .order('created_at', { ascending: false });
         if (error) {
             console.error('Failed to load projects:', error);
@@ -84,43 +88,50 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setSubmitError('');
+    const submitProject = async (values) => {
         if (!currentUser) {
             onLogin();
-            return;
+            return 'Please log in to submit a project.';
         }
-        const validation = validateProjectForm(form);
-        if (validation) {
-            setSubmitError(validation);
-            return;
-        }
-
-        setSubmitting(true);
         const { error } = await supabase.from('projects').insert([{
-            title: form.title.trim(),
-            description: form.description.trim(),
-            tech_stack: parseTechStack(form.tech_stack, LIMITS.techStackMax),
-            // Store the normalised form (lower-cased scheme/host) that validation
-            // checked, so the case-sensitive DB CHECK constraints see the same string.
-            github_url: safeHttpUrl(form.github_url.trim()),
-            demo_url: safeHttpUrl(form.demo_url.trim()),
+            ...formValuesToRow(values),
             author_id: currentUser.id,
-            slug: makeSlug(form.title),
+            slug: makeSlug(values.title),
             status: 'active',
         }]);
-        setSubmitting(false);
-
         if (error) {
             console.error('Failed to save project:', error);
-            setSubmitError(friendlyError(error, 'Failed to submit project. Please try again.'));
-            return;
+            return friendlyError(error, 'Failed to submit project. Please try again.');
         }
-        setForm(EMPTY_FORM);
         setShowSubmitForm(false);
         await loadProjects();
+        return '';
     };
+
+    // Patch the list from the UPDATE's returned row, so the modal shows the
+    // saved values immediately (no window where it shows, or re-edits, the
+    // old ones) and doesn't depend on a follow-up reload succeeding.
+    const handleProjectUpdated = useCallback((row) => {
+        setProjects((prev) => prev.map((p) => (p.id === row.id ? { ...p, ...row } : p)));
+    }, []);
+
+    const handleProjectDeleted = useCallback(({ id, title }) => {
+        setLastDeletedId(String(id));
+        setProjects((prev) => prev.filter((p) => String(p.id) !== String(id)));
+        setNotice(`"${title}" was deleted.`);
+        navigate('/projects');
+    }, []);
+
+    // The deleted card (the modal's opener) is gone, so focus would fall to
+    // <body>; put it on the page heading, next to the status message.
+    useEffect(() => {
+        if (notice) headingRef.current?.focus();
+    }, [notice]);
+
+    // Opening another project clears the status line.
+    useEffect(() => {
+        if (selectedId && selectedId !== lastDeletedId) setNotice('');
+    }, [selectedId, lastDeletedId]);
 
     const allProjects = useMemo(() => [
         ...projects.map((p) => ({
@@ -132,6 +143,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
             githubUrl: p.github_url,
             demoUrl: p.demo_url,
             author: p.profiles?.username || 'Unknown',
+            authorId: p.author_id,
             stars: p.stars_count || 0,
             isSupabase: true,
         })),
@@ -148,12 +160,24 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
         })),
     ], [projects, githubProjects]);
 
+    // "My projects" only applies while logged in (logging out shows everything).
+    const showMine = mineOnly && Boolean(currentUser);
+
+    const languages = useMemo(
+        () => ['all', ...new Set(allProjects.map((p) => p.language).filter(Boolean))],
+        [allProjects],
+    );
+    // If an edit/delete (or a new GitHub pick set) removes the selected
+    // language, fall back to "all" instead of filtering on a ghost value.
+    const activeLanguage = languages.includes(filterLanguage) ? filterLanguage : 'all';
+
     const filteredProjects = useMemo(() => {
         const q = debouncedSearch.toLowerCase();
         return allProjects
+            .filter((p) => !showMine || p.authorId === currentUser.id)
             .filter((p) => {
                 const matchesSearch = p.title.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q);
-                const matchesLanguage = filterLanguage === 'all' || p.language?.toLowerCase() === filterLanguage.toLowerCase();
+                const matchesLanguage = activeLanguage === 'all' || p.language?.toLowerCase() === activeLanguage.toLowerCase();
                 return matchesSearch && matchesLanguage;
             })
             .sort((a, b) => {
@@ -161,24 +185,19 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                 if (sortBy === 'az') return a.title.localeCompare(b.title);
                 return 0; // 'newest': keep created_at desc order from the query
             });
-    }, [allProjects, debouncedSearch, filterLanguage, sortBy]);
-
-    const languages = useMemo(
-        () => ['all', ...new Set(allProjects.map((p) => p.language).filter(Boolean))],
-        [allProjects],
-    );
+    }, [allProjects, debouncedSearch, activeLanguage, sortBy, showMine, currentUser]);
 
     const selectedProject = selectedId ? allProjects.find((p) => p.id === selectedId) : null;
     // A shared link to a deleted project, or to a GitHub pick this browser
     // didn't fetch (the picks are a random topic per visitor), resolves to nothing.
     // Only when the list actually loaded: if it failed, the load error says so.
-    const notFound = Boolean(selectedId) && !loading && !loadError && githubSettled && !selectedProject;
-    const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+    const notFound = Boolean(selectedId) && selectedId !== lastDeletedId
+        && !loading && !loadError && githubSettled && !selectedProject;
 
     return (
         <div className="container">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <h1 className="card-title" style={{ margin: 0 }}>Community Projects</h1>
+                <h1 ref={headingRef} tabIndex={-1} className="card-title page-heading" style={{ margin: 0 }}>Community Projects</h1>
                 {currentUser && (
                     <button className="btn btn-primary" onClick={() => setShowSubmitForm((s) => !s)}>
                         {showSubmitForm ? 'Cancel' : '+ Submit Project'}
@@ -189,38 +208,13 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
             {showSubmitForm && (
                 <div className="card">
                     <h2 className="card-title">Submit Your Project</h2>
-                    {submitError && <div className="form-error" role="alert">{submitError}</div>}
-                    <form onSubmit={handleSubmit}>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="project-title">Project Title</label>
-                            <input id="project-title" type="text" className="form-input" value={form.title}
-                                onChange={update('title')} minLength={LIMITS.titleMin} maxLength={LIMITS.titleMax} required />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="project-description">Description</label>
-                            <textarea id="project-description" className="form-textarea" value={form.description}
-                                onChange={update('description')} maxLength={LIMITS.descriptionMax} required />
-                            <div className="form-hint">{form.description.length}/{LIMITS.descriptionMax}</div>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="project-tech">Tech Stack (comma-separated)</label>
-                            <input id="project-tech" type="text" className="form-input" placeholder="e.g., JavaScript, React, Node.js"
-                                value={form.tech_stack} onChange={update('tech_stack')} required />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="project-github">GitHub URL (optional)</label>
-                            <input id="project-github" type="url" className="form-input" placeholder="https://github.com/username/repo"
-                                value={form.github_url} onChange={update('github_url')} />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="project-demo">Demo URL (optional)</label>
-                            <input id="project-demo" type="url" className="form-input" placeholder="https://demo.example.com"
-                                value={form.demo_url} onChange={update('demo_url')} />
-                        </div>
-                        <button type="submit" className="btn btn-primary" disabled={submitting}>
-                            {submitting ? 'Submitting...' : 'Submit Project'}
-                        </button>
-                    </form>
+                    <ProjectForm
+                        initialValues={EMPTY_PROJECT_FORM}
+                        idPrefix="project"
+                        submitLabel="Submit Project"
+                        submittingLabel="Submitting..."
+                        onSubmit={submitProject}
+                    />
                 </div>
             )}
 
@@ -235,14 +229,25 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                     <option value="stars">Most Stars</option>
                     <option value="az">A — Z</option>
                 </select>
-                <select className="form-select" value={filterLanguage} onChange={(e) => setFilterLanguage(e.target.value)}
+                <select className="form-select" value={activeLanguage} onChange={(e) => setFilterLanguage(e.target.value)}
                     style={{ minWidth: '150px' }} aria-label="Filter by language">
                     {languages.map((lang) => (
                         <option key={lang} value={lang}>{lang === 'all' ? 'All Languages' : lang}</option>
                     ))}
                 </select>
+                {currentUser && (
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-small toggle-button"
+                        aria-pressed={showMine}
+                        onClick={() => setMineOnly((m) => !m)}
+                    >
+                        My projects
+                    </button>
+                )}
             </div>
 
+            {notice && <div className="form-success-msg" role="status" style={{ marginBottom: '1rem' }}>{notice}</div>}
             {loadError && <div className="form-error" role="alert" style={{ marginBottom: '1rem' }}>{loadError}</div>}
             {notFound && (
                 <div className="form-error" role="alert" style={{ marginBottom: '1rem' }}>
@@ -256,7 +261,11 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
             ) : filteredProjects.length === 0 ? (
                 <div className="empty-state">
                     <div className="empty-state-icon">📦</div>
-                    <p>No projects found. Be the first to submit one!</p>
+                    <p>
+                        {showMine && !debouncedSearch && activeLanguage === 'all'
+                            ? "You haven't submitted any projects yet."
+                            : 'No projects found. Be the first to submit one!'}
+                    </p>
                 </div>
             ) : (
                 <div className="projects-grid">
@@ -306,6 +315,8 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                     onClose={() => navigate('/projects')}
                     currentUser={currentUser}
                     onLogin={onLogin}
+                    onUpdated={handleProjectUpdated}
+                    onDeleted={handleProjectDeleted}
                 />
             )}
         </div>

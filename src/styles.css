@@ -989,3 +989,38 @@ main:focus {
     white-space: nowrap;
     border: 0;
 }
+
+/* Project owner actions (edit / delete) in the detail modal */
+.project-owner-actions {
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.btn-danger {
+    border-color: var(--error);
+    color: var(--error);
+    background: transparent;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: var(--error);
+    color: var(--on-accent);
+}
+
+.project-edit-card {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Two-state filter buttons ("My projects") */
+.toggle-button[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--paper);
+}
+
+/* Receives focus after deleting a project (announced with the status line). */
+.page-heading:focus {
+    outline: none;
+}

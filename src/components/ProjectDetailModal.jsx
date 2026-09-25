@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from './Modal.jsx';
+import ProjectForm from './ProjectForm.jsx';
 import { supabase, friendlyError } from '../lib/supabase.js';
 import { formatRelativeDate, safeHttpUrl } from '../lib/utils.js';
+import { PROJECT_LIST_COLUMNS, formValuesToRow, projectToFormValues } from '../lib/projectForm.js';
 import { LIMITS } from '../config.js';
 
 const COMMENT_SELECT = '*, profiles!comments_author_id_fkey(username)';
 const PAGE = 5;
 
-export default function ProjectDetailModal({ project, onClose, currentUser, onLogin }) {
+export default function ProjectDetailModal({ project, onClose, currentUser, onLogin, onUpdated, onDeleted }) {
     const [comments, setComments] = useState([]);
     const [commentsLoading, setCommentsLoading] = useState(true);
     const [newComment, setNewComment] = useState('');
@@ -17,8 +19,24 @@ export default function ProjectDetailModal({ project, onClose, currentUser, onLo
     const [editing, setEditing] = useState(null);
     const [editContent, setEditContent] = useState('');
     const [reported, setReported] = useState(() => new Set());
+    const [editingProject, setEditingProject] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [projectError, setProjectError] = useState('');
+    const editButtonRef = useRef(null);
+    const wasEditing = useRef(false);
 
     const isCommunity = project.isSupabase;
+    // UI only; RLS enforces ownership on UPDATE/DELETE regardless.
+    const isOwner = isCommunity && Boolean(currentUser) && currentUser.id === project.authorId;
+    // If the session ends or changes while the form is open, drop the form.
+    const showEditForm = editingProject && isOwner;
+
+    // The Edit button is replaced by the form while editing; when the form
+    // closes (Cancel or Save), give focus back to it instead of <body>.
+    useEffect(() => {
+        if (wasEditing.current && !showEditForm) editButtonRef.current?.focus();
+        wasEditing.current = showEditForm;
+    }, [showEditForm]);
 
     const loadComments = useCallback(async () => {
         const { data, error } = await supabase
@@ -109,6 +127,58 @@ export default function ProjectDetailModal({ project, onClose, currentUser, onLo
         setReported((prev) => new Set([...prev, commentId]));
     };
 
+    // RLS turns a non-owner's UPDATE/DELETE into "0 rows" without an error,
+    // and so does a project deleted meanwhile (e.g. in another tab). Tell
+    // them apart with a read, which RLS allows for everyone.
+    const projectStillExists = async () => {
+        const { data } = await supabase.from('projects').select('id').eq('id', project.id);
+        return Boolean(data?.length);
+    };
+
+    // Resolves to an error message, or '' on success (ProjectForm contract).
+    const saveProject = async (values) => {
+        const { data, error } = await supabase
+            .from('projects')
+            .update(formValuesToRow(values))
+            .eq('id', project.id)
+            .select(PROJECT_LIST_COLUMNS);
+        if (error) {
+            console.error('Failed to update project:', error);
+            return friendlyError(error, 'Failed to save changes. Please try again.');
+        }
+        if (!data?.length) {
+            return (await projectStillExists())
+                ? 'You can only edit your own projects.'
+                : 'This project no longer exists. It may have been deleted in another tab.';
+        }
+        setEditingProject(false);
+        onUpdated?.(data[0]);
+        return '';
+    };
+
+    const deleteProject = async () => {
+        const ok = window.confirm(
+            `Delete "${project.title}"?\n\nIts comments and stars are deleted too. This cannot be undone.`,
+        );
+        if (!ok) return;
+        setDeleting(true);
+        setProjectError('');
+        const { data, error } = await supabase.from('projects').delete().eq('id', project.id).select('id');
+        if (error) {
+            setDeleting(false);
+            console.error('Failed to delete project:', error);
+            setProjectError(friendlyError(error, 'Failed to delete the project. Please try again.'));
+            return;
+        }
+        // Already gone (deleted in another tab) is the outcome they asked for.
+        if (!data?.length && (await projectStillExists())) {
+            setDeleting(false);
+            setProjectError('You can only delete your own projects.');
+            return;
+        }
+        onDeleted?.({ id: project.id, title: project.title });
+    };
+
     const githubUrl = safeHttpUrl(project.githubUrl);
     const demoUrl = safeHttpUrl(project.demoUrl);
 
@@ -122,34 +192,62 @@ export default function ProjectDetailModal({ project, onClose, currentUser, onLo
                 {isCommunity && <span className="meta-text">• Community</span>}
             </div>
 
-            <div style={{ fontSize: '1rem', lineHeight: 1.7, marginBottom: '1.5rem', whiteSpace: 'pre-wrap' }}>
-                {project.description || 'No description provided.'}
-            </div>
-
-            {project.tech_stack?.length > 0 && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.8rem' }}>Tech Stack:</div>
-                    <div className="project-tech-stack">
-                        {project.tech_stack.map((tech) => (
-                            <span key={tech} className="tech-tag">{tech}</span>
-                        ))}
-                    </div>
+            {isOwner && !showEditForm && (
+                <div className="project-owner-actions">
+                    <button ref={editButtonRef} type="button" className="btn btn-secondary btn-small" onClick={() => { setProjectError(''); setEditingProject(true); }}>
+                        Edit project
+                    </button>
+                    <button type="button" className="btn btn-danger btn-small" onClick={deleteProject} disabled={deleting}>
+                        {deleting ? 'Deleting...' : 'Delete project'}
+                    </button>
                 </div>
             )}
+            {projectError && <div className="form-error" role="alert">{projectError}</div>}
 
-            {(githubUrl || demoUrl) && (
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-                    {githubUrl && (
-                        <a href={githubUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
-                            View on GitHub →
-                        </a>
-                    )}
-                    {demoUrl && (
-                        <a href={demoUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
-                            Live Demo →
-                        </a>
-                    )}
+            {showEditForm ? (
+                <div className="card project-edit-card">
+                    <ProjectForm
+                        initialValues={projectToFormValues(project)}
+                        idPrefix="edit-project"
+                        submitLabel="Save changes"
+                        submittingLabel="Saving..."
+                        onSubmit={saveProject}
+                        onCancel={() => setEditingProject(false)}
+                        autoFocus
+                    />
                 </div>
+            ) : (
+                <>
+                <div style={{ fontSize: '1rem', lineHeight: 1.7, marginBottom: '1.5rem', whiteSpace: 'pre-wrap' }}>
+                    {project.description || 'No description provided.'}
+                </div>
+
+                {project.tech_stack?.length > 0 && (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.8rem' }}>Tech Stack:</div>
+                        <div className="project-tech-stack">
+                            {project.tech_stack.map((tech) => (
+                                <span key={tech} className="tech-tag">{tech}</span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {(githubUrl || demoUrl) && (
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+                        {githubUrl && (
+                            <a href={githubUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
+                                View on GitHub →
+                            </a>
+                        )}
+                        {demoUrl && (
+                            <a href={demoUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                                Live Demo →
+                            </a>
+                        )}
+                    </div>
+                )}
+                </>
             )}
 
             {isCommunity && (
