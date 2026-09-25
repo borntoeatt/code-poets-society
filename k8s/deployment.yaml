@@ -45,7 +45,7 @@ spec:
         # in .github/workflows/docker.yml after each successful push to main;
         # Argo CD then syncs the new digest. Do not edit by hand unless the
         # workflow is broken.
-        image: dporkov/code-poets-society@sha256:4811d96fe011e320df74d0797cf63e0f236263066a0d60a205091353c1467df6
+        image: dporkov/code-poets-society@sha256:5bc1c2bc2989c4cb99979f7e88a83fc3b5a7cf66e59509714166e1457d186ae6
         # IfNotPresent is correct with digest-pinned images — the digest
         # already guarantees content, no need to re-pull on every restart.
         imagePullPolicy: IfNotPresent
