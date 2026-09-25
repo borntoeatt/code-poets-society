@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase, friendlyError } from '../lib/supabase.js';
 import { navigate } from '../hooks/useHashRoute.js';
 import { makeSlug } from '../lib/utils.js';
-import { EMPTY_PROJECT_FORM, formValuesToRow } from '../lib/projectForm.js';
+import { EMPTY_PROJECT_FORM, PROJECT_LIST_COLUMNS, formValuesToRow } from '../lib/projectForm.js';
 import ProjectDetailModal from '../components/ProjectDetailModal.jsx';
 import ProjectForm from '../components/ProjectForm.jsx';
 
@@ -41,6 +41,11 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
     const [loadError, setLoadError] = useState('');
     const [showSubmitForm, setShowSubmitForm] = useState(false);
     const [mineOnly, setMineOnly] = useState(false);
+    // Status line after an owner action ("X was deleted."), and the id just
+    // deleted so its still-in-the-URL id doesn't flash "not found".
+    const [notice, setNotice] = useState('');
+    const [lastDeletedId, setLastDeletedId] = useState(null);
+    const headingRef = useRef(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [filterLanguage, setFilterLanguage] = useState('all');
@@ -61,7 +66,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
         // (long_description etc.), so one oversized row can't slow everyone.
         const { data, error } = await supabase
             .from('projects')
-            .select('id, title, description, tech_stack, github_url, demo_url, stars_count, status, created_at, author_id, profiles!projects_author_id_fkey(username)')
+            .select(PROJECT_LIST_COLUMNS)
             .order('created_at', { ascending: false });
         if (error) {
             console.error('Failed to load projects:', error);
@@ -103,11 +108,30 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
         return '';
     };
 
-    const refreshProjects = useCallback(() => loadProjects({ quiet: true }), []); // eslint-disable-line react-hooks/exhaustive-deps
-    const handleProjectDeleted = useCallback(() => {
+    // Patch the list from the UPDATE's returned row, so the modal shows the
+    // saved values immediately (no window where it shows, or re-edits, the
+    // old ones) and doesn't depend on a follow-up reload succeeding.
+    const handleProjectUpdated = useCallback((row) => {
+        setProjects((prev) => prev.map((p) => (p.id === row.id ? { ...p, ...row } : p)));
+    }, []);
+
+    const handleProjectDeleted = useCallback(({ id, title }) => {
+        setLastDeletedId(String(id));
+        setProjects((prev) => prev.filter((p) => String(p.id) !== String(id)));
+        setNotice(`"${title}" was deleted.`);
         navigate('/projects');
-        loadProjects({ quiet: true });
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
+
+    // The deleted card (the modal's opener) is gone, so focus would fall to
+    // <body>; put it on the page heading, next to the status message.
+    useEffect(() => {
+        if (notice) headingRef.current?.focus();
+    }, [notice]);
+
+    // Opening another project clears the status line.
+    useEffect(() => {
+        if (selectedId && selectedId !== lastDeletedId) setNotice('');
+    }, [selectedId, lastDeletedId]);
 
     const allProjects = useMemo(() => [
         ...projects.map((p) => ({
@@ -139,13 +163,21 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
     // "My projects" only applies while logged in (logging out shows everything).
     const showMine = mineOnly && Boolean(currentUser);
 
+    const languages = useMemo(
+        () => ['all', ...new Set(allProjects.map((p) => p.language).filter(Boolean))],
+        [allProjects],
+    );
+    // If an edit/delete (or a new GitHub pick set) removes the selected
+    // language, fall back to "all" instead of filtering on a ghost value.
+    const activeLanguage = languages.includes(filterLanguage) ? filterLanguage : 'all';
+
     const filteredProjects = useMemo(() => {
         const q = debouncedSearch.toLowerCase();
         return allProjects
             .filter((p) => !showMine || p.authorId === currentUser.id)
             .filter((p) => {
                 const matchesSearch = p.title.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q);
-                const matchesLanguage = filterLanguage === 'all' || p.language?.toLowerCase() === filterLanguage.toLowerCase();
+                const matchesLanguage = activeLanguage === 'all' || p.language?.toLowerCase() === activeLanguage.toLowerCase();
                 return matchesSearch && matchesLanguage;
             })
             .sort((a, b) => {
@@ -153,23 +185,19 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                 if (sortBy === 'az') return a.title.localeCompare(b.title);
                 return 0; // 'newest': keep created_at desc order from the query
             });
-    }, [allProjects, debouncedSearch, filterLanguage, sortBy, showMine, currentUser]);
-
-    const languages = useMemo(
-        () => ['all', ...new Set(allProjects.map((p) => p.language).filter(Boolean))],
-        [allProjects],
-    );
+    }, [allProjects, debouncedSearch, activeLanguage, sortBy, showMine, currentUser]);
 
     const selectedProject = selectedId ? allProjects.find((p) => p.id === selectedId) : null;
     // A shared link to a deleted project, or to a GitHub pick this browser
     // didn't fetch (the picks are a random topic per visitor), resolves to nothing.
     // Only when the list actually loaded: if it failed, the load error says so.
-    const notFound = Boolean(selectedId) && !loading && !loadError && githubSettled && !selectedProject;
+    const notFound = Boolean(selectedId) && selectedId !== lastDeletedId
+        && !loading && !loadError && githubSettled && !selectedProject;
 
     return (
         <div className="container">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <h1 className="card-title" style={{ margin: 0 }}>Community Projects</h1>
+                <h1 ref={headingRef} tabIndex={-1} className="card-title page-heading" style={{ margin: 0 }}>Community Projects</h1>
                 {currentUser && (
                     <button className="btn btn-primary" onClick={() => setShowSubmitForm((s) => !s)}>
                         {showSubmitForm ? 'Cancel' : '+ Submit Project'}
@@ -201,7 +229,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                     <option value="stars">Most Stars</option>
                     <option value="az">A — Z</option>
                 </select>
-                <select className="form-select" value={filterLanguage} onChange={(e) => setFilterLanguage(e.target.value)}
+                <select className="form-select" value={activeLanguage} onChange={(e) => setFilterLanguage(e.target.value)}
                     style={{ minWidth: '150px' }} aria-label="Filter by language">
                     {languages.map((lang) => (
                         <option key={lang} value={lang}>{lang === 'all' ? 'All Languages' : lang}</option>
@@ -219,6 +247,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                 )}
             </div>
 
+            {notice && <div className="form-success-msg" role="status" style={{ marginBottom: '1rem' }}>{notice}</div>}
             {loadError && <div className="form-error" role="alert" style={{ marginBottom: '1rem' }}>{loadError}</div>}
             {notFound && (
                 <div className="form-error" role="alert" style={{ marginBottom: '1rem' }}>
@@ -233,7 +262,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                 <div className="empty-state">
                     <div className="empty-state-icon">📦</div>
                     <p>
-                        {showMine && !debouncedSearch && filterLanguage === 'all'
+                        {showMine && !debouncedSearch && activeLanguage === 'all'
                             ? "You haven't submitted any projects yet."
                             : 'No projects found. Be the first to submit one!'}
                     </p>
@@ -286,7 +315,7 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                     onClose={() => navigate('/projects')}
                     currentUser={currentUser}
                     onLogin={onLogin}
-                    onUpdated={refreshProjects}
+                    onUpdated={handleProjectUpdated}
                     onDeleted={handleProjectDeleted}
                 />
             )}

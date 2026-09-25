@@ -3,7 +3,7 @@ import Modal from './Modal.jsx';
 import ProjectForm from './ProjectForm.jsx';
 import { supabase, friendlyError } from '../lib/supabase.js';
 import { formatRelativeDate, safeHttpUrl } from '../lib/utils.js';
-import { formValuesToRow, projectToFormValues } from '../lib/projectForm.js';
+import { PROJECT_LIST_COLUMNS, formValuesToRow, projectToFormValues } from '../lib/projectForm.js';
 import { LIMITS } from '../config.js';
 
 const COMMENT_SELECT = '*, profiles!comments_author_id_fkey(username)';
@@ -25,16 +25,18 @@ export default function ProjectDetailModal({ project, onClose, currentUser, onLo
     const editButtonRef = useRef(null);
     const wasEditing = useRef(false);
 
-    // The Edit button is replaced by the form while editing; when the form
-    // closes (Cancel or Save), give focus back to it instead of <body>.
-    useEffect(() => {
-        if (wasEditing.current && !editingProject) editButtonRef.current?.focus();
-        wasEditing.current = editingProject;
-    }, [editingProject]);
-
     const isCommunity = project.isSupabase;
     // UI only; RLS enforces ownership on UPDATE/DELETE regardless.
     const isOwner = isCommunity && Boolean(currentUser) && currentUser.id === project.authorId;
+    // If the session ends or changes while the form is open, drop the form.
+    const showEditForm = editingProject && isOwner;
+
+    // The Edit button is replaced by the form while editing; when the form
+    // closes (Cancel or Save), give focus back to it instead of <body>.
+    useEffect(() => {
+        if (wasEditing.current && !showEditForm) editButtonRef.current?.focus();
+        wasEditing.current = showEditForm;
+    }, [showEditForm]);
 
     const loadComments = useCallback(async () => {
         const { data, error } = await supabase
@@ -125,21 +127,32 @@ export default function ProjectDetailModal({ project, onClose, currentUser, onLo
         setReported((prev) => new Set([...prev, commentId]));
     };
 
+    // RLS turns a non-owner's UPDATE/DELETE into "0 rows" without an error,
+    // and so does a project deleted meanwhile (e.g. in another tab). Tell
+    // them apart with a read, which RLS allows for everyone.
+    const projectStillExists = async () => {
+        const { data } = await supabase.from('projects').select('id').eq('id', project.id);
+        return Boolean(data?.length);
+    };
+
     // Resolves to an error message, or '' on success (ProjectForm contract).
     const saveProject = async (values) => {
         const { data, error } = await supabase
             .from('projects')
             .update(formValuesToRow(values))
             .eq('id', project.id)
-            .select('id');
+            .select(PROJECT_LIST_COLUMNS);
         if (error) {
             console.error('Failed to update project:', error);
             return friendlyError(error, 'Failed to save changes. Please try again.');
         }
-        // RLS filters the row out instead of raising when it isn't yours.
-        if (!data?.length) return 'You can only edit your own projects.';
+        if (!data?.length) {
+            return (await projectStillExists())
+                ? 'You can only edit your own projects.'
+                : 'This project no longer exists. It may have been deleted in another tab.';
+        }
         setEditingProject(false);
-        await onUpdated?.();
+        onUpdated?.(data[0]);
         return '';
     };
 
@@ -151,15 +164,19 @@ export default function ProjectDetailModal({ project, onClose, currentUser, onLo
         setDeleting(true);
         setProjectError('');
         const { data, error } = await supabase.from('projects').delete().eq('id', project.id).select('id');
-        setDeleting(false);
-        if (error || !data?.length) {
-            if (error) console.error('Failed to delete project:', error);
-            setProjectError(error
-                ? friendlyError(error, 'Failed to delete the project. Please try again.')
-                : 'You can only delete your own projects.');
+        if (error) {
+            setDeleting(false);
+            console.error('Failed to delete project:', error);
+            setProjectError(friendlyError(error, 'Failed to delete the project. Please try again.'));
             return;
         }
-        onDeleted?.();
+        // Already gone (deleted in another tab) is the outcome they asked for.
+        if (!data?.length && (await projectStillExists())) {
+            setDeleting(false);
+            setProjectError('You can only delete your own projects.');
+            return;
+        }
+        onDeleted?.({ id: project.id, title: project.title });
     };
 
     const githubUrl = safeHttpUrl(project.githubUrl);
@@ -175,7 +192,7 @@ export default function ProjectDetailModal({ project, onClose, currentUser, onLo
                 {isCommunity && <span className="meta-text">• Community</span>}
             </div>
 
-            {isOwner && !editingProject && (
+            {isOwner && !showEditForm && (
                 <div className="project-owner-actions">
                     <button ref={editButtonRef} type="button" className="btn btn-secondary btn-small" onClick={() => { setProjectError(''); setEditingProject(true); }}>
                         Edit project
@@ -187,7 +204,7 @@ export default function ProjectDetailModal({ project, onClose, currentUser, onLo
             )}
             {projectError && <div className="form-error" role="alert">{projectError}</div>}
 
-            {editingProject ? (
+            {showEditForm ? (
                 <div className="card project-edit-card">
                     <ProjectForm
                         initialValues={projectToFormValues(project)}

@@ -1019,3 +1019,8 @@ main:focus {
     background: var(--ink);
     color: var(--paper);
 }
+
+/* Receives focus after deleting a project (announced with the status line). */
+.page-heading:focus {
+    outline: none;
+}
