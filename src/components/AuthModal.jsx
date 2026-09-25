@@ -14,7 +14,9 @@ export default function AuthModal({ auth, onClose }) {
     // sign-up, login and password reset, so the widget is shown in every mode
     // and the token sent with every request. Tokens are single-use, so the
     // widget is reset after each submit.
-    const turnstile = useTurnstile(true);
+    // Destructured: reading fields off an object that also holds a ref counts
+    // as a ref read during render for the React Compiler lint rules.
+    const { containerRef: turnstileRef, token: turnstileToken, reset: resetTurnstile, error: turnstileError } = useTurnstile(true);
 
     const switchMode = (next) => {
         setMode(next);
@@ -29,13 +31,13 @@ export default function AuthModal({ auth, onClose }) {
         setError('');
         setSuccessMsg('');
 
-        if (!turnstile.token) {
+        if (!turnstileToken) {
             setError('Please complete the CAPTCHA verification');
             return;
         }
 
         setLoading(true);
-        const captchaToken = turnstile.token;
+        const captchaToken = turnstileToken;
         let result;
         if (mode === 'reset') {
             result = await auth.resetPassword({ email: form.email, captchaToken });
@@ -45,7 +47,7 @@ export default function AuthModal({ auth, onClose }) {
             result = await auth.signup({ ...form, captchaToken });
         }
         setLoading(false);
-        turnstile.reset();
+        resetTurnstile();
 
         if (!result.success) {
             setError(result.error);
@@ -115,8 +117,8 @@ export default function AuthModal({ auth, onClose }) {
                     </button>
                 )}
 
-                <div ref={turnstile.containerRef} style={{ margin: '0.5rem 0' }} />
-                {turnstile.error && <div className="form-error" role="alert">{turnstile.error}</div>}
+                <div ref={turnstileRef} style={{ margin: '0.5rem 0' }} />
+                {turnstileError && <div className="form-error" role="alert">{turnstileError}</div>}
 
                 {error && <div className="form-error" role="alert">{error}</div>}
                 {successMsg && <div className="form-success-msg" role="status">{successMsg}</div>}
@@ -125,7 +127,7 @@ export default function AuthModal({ auth, onClose }) {
                     type="submit"
                     className="btn btn-primary"
                     style={{ width: '100%', marginTop: '1rem' }}
-                    disabled={loading || !turnstile.token}
+                    disabled={loading || !turnstileToken}
                 >
                     {loading
                         ? 'Processing...'

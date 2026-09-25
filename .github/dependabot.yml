@@ -18,8 +18,15 @@ updates:
     schedule:
       interval: weekly
     groups:
-      # Minor/patch updates in one PR; majors arrive individually so they
-      # can be reviewed on their own.
+      # Packages that only work at matching versions move together (majors
+      # included); bumped one at a time they fail `npm ci` with ERESOLVE.
+      react:
+        patterns: ['react', 'react-dom']
+      vite-toolchain:
+        patterns: ['vite', '@vitejs/*', 'vitest', '@vitest/*']
+      eslint:
+        patterns: ['eslint', '@eslint/*', 'eslint-plugin-*', 'globals']
+      # Everything else: minor/patch in one PR; majors arrive individually.
       minor-and-patch:
         update-types: [minor, patch]
 
