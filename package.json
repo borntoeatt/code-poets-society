@@ -13,7 +13,7 @@
     "check:edge": "cd supabase/functions/verify-turnstile && npx -y deno@2.1.4 check --frozen index.ts && npx -y deno@2.1.4 lint"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.0",
+    "@supabase/supabase-js": "^2.117.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
