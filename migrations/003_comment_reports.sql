@@ -1,5 +1,11 @@
--- Comment Reports table
--- Run this in Supabase SQL Editor
+-- 003: Comment reports
+-- Run this in the Supabase SQL Editor. Safe to re-run.
+--
+-- Backs the "Report" button on comments. Users can file one report per
+-- comment and see only their own reports; nobody can read others' reports
+-- from the browser (moderation happens in the dashboard for now).
+
+BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.comment_reports (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -12,12 +18,18 @@ CREATE TABLE IF NOT EXISTS public.comment_reports (
 
 ALTER TABLE public.comment_reports ENABLE ROW LEVEL SECURITY;
 
--- Authenticated users can report comments
+-- Authenticated users can report comments, as themselves only
+DROP POLICY IF EXISTS "Authenticated users can report comments" ON public.comment_reports;
 CREATE POLICY "Authenticated users can report comments" ON public.comment_reports
-    FOR INSERT WITH CHECK (auth.role() = 'authenticated' AND auth.uid() = reporter_id);
+    FOR INSERT TO authenticated
+    WITH CHECK (auth.uid() = reporter_id);
 
 -- Users can see their own reports
+DROP POLICY IF EXISTS "Users can see own reports" ON public.comment_reports;
 CREATE POLICY "Users can see own reports" ON public.comment_reports
-    FOR SELECT USING (auth.uid() = reporter_id);
+    FOR SELECT TO authenticated
+    USING (auth.uid() = reporter_id);
 
-CREATE INDEX idx_comment_reports_comment ON public.comment_reports(comment_id);
+CREATE INDEX IF NOT EXISTS idx_comment_reports_comment ON public.comment_reports(comment_id);
+
+COMMIT;
