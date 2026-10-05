@@ -47,7 +47,7 @@ spec:
       annotations:
         summary: "Supabase API for Code Poets is unreachable"
         description: >-
-          The REST API has failed three checks in a row. The most likely cause
+          The REST API has failed every check for 15 minutes. The most likely cause
           is that the free-tier project was paused: restore it from the
           Supabase dashboard. Login, projects and comments don't work until then.
 

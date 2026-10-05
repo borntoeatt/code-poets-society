@@ -33,8 +33,10 @@ spec:
       static:
         - http://code-poets-society.codepoets.svc/
 ---
-# Every 5 minutes: enough to catch a paused project within ~15 minutes
-# without hammering the free-tier API (this also counts as activity).
+# Every 2 minutes (~720 requests/day, trivial for Supabase; also counts as
+# activity). Must stay well under Prometheus's 5m lookback window: at exactly
+# 5m the latest sample briefly drops out of range on every cycle, which
+# resets a pending alert's `for` timer so CodePoetsSupabaseDown never fires.
 apiVersion: monitoring.coreos.com/v1
 kind: Probe
 metadata:
@@ -42,7 +44,7 @@ metadata:
   labels:
     release: kube-prometheus-stack
 spec:
-  interval: 5m
+  interval: 2m
   scrapeTimeout: 15s
   module: supabase_rest
   prober:

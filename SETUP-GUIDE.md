@@ -203,7 +203,9 @@ Synced by Argo from `k8s/` along with the app (namespace `codepoets`):
   - **site**: `https://codepoetssociety.info/` through Cloudflare, every
     minute. Must be HTTPS 200, contain the app shell and carry our CSP header.
   - **origin**: the in-cluster Service, every minute (bypasses Cloudflare).
-  - **supabase**: the REST API with the public anon key, every 5 minutes.
+  - **supabase**: the REST API with the public anon key, every 2 minutes
+    (keep probe intervals well under Prometheus's 5-minute lookback, or
+    alerts with a `for:` duration can be reset on every cycle).
 - `monitoring-alerts.yaml`: alerts, delivered by Alertmanager's default
   route (email):
 
@@ -211,7 +213,7 @@ Synced by Argo from `k8s/` along with the app (namespace `codepoets`):
 |---|---|---|
 | CodePoetsSiteDown | site check fails 5 min | visitors can't load the site; if OriginDown isn't also firing, it's Cloudflare/DNS |
 | CodePoetsOriginDown | in-cluster check fails 5 min | the pods aren't serving |
-| CodePoetsSupabaseDown | 3 failed API checks (15 min) | the free-tier project was paused; restore it in the dashboard |
+| CodePoetsSupabaseDown | API checks fail for 15 min | the free-tier project was paused; restore it in the dashboard |
 | CodePoetsCertExpiringSoon | TLS cert < 14 days | Cloudflare didn't renew the edge certificate |
 | CodePoetsMonitoringBlind | no probe data for 15 min | the exporter or the Probes are broken, so outages would go unnoticed |
 

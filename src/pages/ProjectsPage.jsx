@@ -345,10 +345,13 @@ export default function ProjectsPage({ currentUser, onLogin, selectedId, onBacke
                 </div>
 
                 {notice && <div className="form-success-msg" role="status" style={{ marginBottom: '1rem' }}>{notice}</div>}
-                {tab === 'community' && loadError && (
+                {/* Each source's error shows on its tab, and also when the open link
+                    points at that source (e.g. a GitHub-pick link followed from the
+                    Community tab), so a failed link is never silent. */}
+                {(tab === 'community' || (selectedId && !isGithubId(selectedId))) && loadError && (
                     <div className="form-error" role="alert" style={{ marginBottom: '1rem' }}>{loadError}</div>
                 )}
-                {tab === 'github' && githubError && (
+                {(tab === 'github' || isGithubId(selectedId)) && githubError && (
                     <div className="form-error" role="alert" style={{ marginBottom: '1rem' }}>
                         Couldn&apos;t load picks from GitHub right now (GitHub limits anonymous requests). Try again later.
                     </div>
