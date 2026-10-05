@@ -1,0 +1,75 @@
+# Availability alerts for the site, routed by Alertmanager's default route
+# (email). Severity must be warning or critical: severity="info" is routed to
+# the "null" receiver in this cluster.
+#
+# Pod-level failures (crash loops, stuck rollouts, replica mismatches) are
+# already covered by kube-prometheus-stack's built-in Kube* rules, so they
+# aren't duplicated here.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: codepoets-availability
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+  - name: codepoets.availability
+    rules:
+    - alert: CodePoetsSiteDown
+      expr: probe_success{job="probe/codepoets/codepoets-site"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "codepoetssociety.info is down for visitors"
+        description: >-
+          The public site has failed its check (HTTPS 200, app shell and our CSP
+          header) for 5 minutes. If CodePoetsOriginDown is also firing, the pods
+          are the problem; if it isn't, look at Cloudflare or DNS.
+
+    - alert: CodePoetsOriginDown
+      expr: probe_success{job="probe/codepoets/codepoets-origin"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Code Poets pods aren't serving inside the cluster"
+        description: >-
+          http://code-poets-society.codepoets.svc/ has failed for 5 minutes.
+          Check: kubectl -n codepoets get pods; kubectl -n codepoets
+          rollout status deploy/code-poets-society
+
+    - alert: CodePoetsSupabaseDown
+      expr: probe_success{job="probe/codepoets/codepoets-supabase"} == 0
+      for: 15m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Supabase API for Code Poets is unreachable"
+        description: >-
+          The REST API has failed three checks in a row. The most likely cause
+          is that the free-tier project was paused: restore it from the
+          Supabase dashboard. Login, projects and comments don't work until then.
+
+    - alert: CodePoetsCertExpiringSoon
+      expr: (probe_ssl_earliest_cert_expiry{job="probe/codepoets/codepoets-site"} - time()) / 86400 < 14
+      for: 1h
+      labels:
+        severity: warning
+      annotations:
+        summary: "TLS certificate for codepoetssociety.info expires in under 14 days"
+        description: >-
+          Cloudflare normally renews edge certificates automatically; check the
+          SSL/TLS settings for the zone if this persists.
+
+    - alert: CodePoetsMonitoringBlind
+      expr: absent(probe_success{job=~"probe/codepoets/.+"})
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "No availability data for Code Poets"
+        description: >-
+          None of the codepoets Probes are producing results, so outages would
+          go unnoticed. Check the blackbox-exporter pod in namespace codepoets
+          and that the Probes carry the label release=kube-prometheus-stack.

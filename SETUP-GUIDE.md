@@ -194,6 +194,39 @@ If CI is broken and you need to pin a digest by hand:
 docker buildx imagetools inspect dporkov/code-poets-society:latest
 ```
 
+## Monitoring and alerts
+
+Synced by Argo from `k8s/` along with the app (namespace `codepoets`):
+
+- `monitoring-blackbox.yaml`: a blackbox exporter that runs the checks.
+- `monitoring-probes.yaml`: what gets checked:
+  - **site**: `https://codepoetssociety.info/` through Cloudflare, every
+    minute. Must be HTTPS 200, contain the app shell and carry our CSP header.
+  - **origin**: the in-cluster Service, every minute (bypasses Cloudflare).
+  - **supabase**: the REST API with the public anon key, every 5 minutes.
+- `monitoring-alerts.yaml`: alerts, delivered by Alertmanager's default
+  route (email):
+
+| Alert | Fires when | Usually means |
+|---|---|---|
+| CodePoetsSiteDown | site check fails 5 min | visitors can't load the site; if OriginDown isn't also firing, it's Cloudflare/DNS |
+| CodePoetsOriginDown | in-cluster check fails 5 min | the pods aren't serving |
+| CodePoetsSupabaseDown | 3 failed API checks (15 min) | the free-tier project was paused; restore it in the dashboard |
+| CodePoetsCertExpiringSoon | TLS cert < 14 days | Cloudflare didn't renew the edge certificate |
+| CodePoetsMonitoringBlind | no probe data for 15 min | the exporter or the Probes are broken, so outages would go unnoticed |
+
+Pod-level failures (crash loops, stuck rollouts, replica mismatches) come
+from kube-prometheus-stack's built-in `Kube*` rules and aren't duplicated.
+Keep alert severities at `warning`/`critical`: this cluster's Alertmanager
+routes `severity="info"` to a null receiver.
+
+Check the probes from inside the cluster:
+
+```bash
+kubectl -n monitoring port-forward svc/kps-prometheus 9090 &
+curl -s 'localhost:9090/api/v1/query?query=probe_success%7Bjob%3D~%22probe/codepoets/.%2B%22%7D'
+```
+
 ## Verify a deployment
 
 1. Home page shows real numbers for projects / members / subscribers.

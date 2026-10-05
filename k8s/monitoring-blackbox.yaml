@@ -1,0 +1,125 @@
+# Blackbox exporter: performs the HTTP checks for the Probes in
+# monitoring-probes.yaml. Prometheus (kube-prometheus-stack, namespace
+# monitoring) calls it; alerts are in monitoring-alerts.yaml.
+#
+# After changing the ConfigMap, bump the config-version annotation on the
+# Deployment so the pod restarts with the new modules.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blackbox-exporter
+data:
+  blackbox.yml: |
+    modules:
+      # Public site through Cloudflare: must be HTTPS, 200, the SPA shell,
+      # and served with our CSP (proves it's our nginx, not an error page).
+      site:
+        prober: http
+        timeout: 10s
+        http:
+          preferred_ip_protocol: ip4
+          valid_status_codes: [200]
+          fail_if_not_ssl: true
+          fail_if_body_not_matches_regexp: ['<div id="root">']
+          fail_if_header_not_matches:
+            - header: Content-Security-Policy
+              regexp: "default-src 'self'"
+      # The Service inside the cluster, bypassing Cloudflare: tells apart
+      # "our pods are down" from "Cloudflare/DNS is the problem".
+      origin:
+        prober: http
+        timeout: 5s
+        http:
+          preferred_ip_protocol: ip4
+          valid_status_codes: [200]
+          fail_if_body_not_matches_regexp: ['<div id="root">']
+      # Supabase REST with the public anon key (it ships in the site's own
+      # JavaScript; RLS is the security boundary). A paused free-tier project
+      # fails here (DNS error or 5xx) before visitors notice.
+      supabase_rest:
+        prober: http
+        timeout: 10s
+        http:
+          preferred_ip_protocol: ip4
+          valid_status_codes: [200]
+          headers:
+            apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6Y3pweWZ1dHB5cW9kZnd3ZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MDQzODAsImV4cCI6MjA4NDA4MDM4MH0.3Gvsj0boPhBV4rGTu0VjfYxaII9QPTjH2PH79U-qlXA
+            Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6Y3pweWZ1dHB5cW9kZnd3ZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MDQzODAsImV4cCI6MjA4NDA4MDM4MH0.3Gvsj0boPhBV4rGTu0VjfYxaII9QPTjH2PH79U-qlXA
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox-exporter
+  labels:
+    app: blackbox-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blackbox-exporter
+  template:
+    metadata:
+      labels:
+        app: blackbox-exporter
+      annotations:
+        codepoets/config-version: "1"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534   # nobody
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: blackbox-exporter
+        # v0.28.0, pinned by multi-arch index digest.
+        image: prom/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc
+        args:
+          - --config.file=/config/blackbox.yml
+        ports:
+        - name: http
+          containerPort: 9115
+        resources:
+          requests:
+            cpu: 10m
+            memory: 24Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: http
+        readinessProbe:
+          httpGet:
+            path: /-/healthy
+            port: http
+        volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: blackbox-exporter
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: blackbox-exporter
+  labels:
+    app: blackbox-exporter
+spec:
+  selector:
+    app: blackbox-exporter
+  ports:
+  - name: http
+    port: 9115
+    targetPort: http
+  type: ClusterIP
