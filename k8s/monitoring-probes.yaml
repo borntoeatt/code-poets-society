@@ -1,0 +1,55 @@
+# What Prometheus checks, through the blackbox exporter in
+# monitoring-blackbox.yaml. The `release` label is what kube-prometheus-stack's
+# Prometheus selects Probes by. Each Probe becomes job="probe/codepoets/<name>".
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: codepoets-site
+  labels:
+    release: kube-prometheus-stack
+spec:
+  interval: 60s
+  module: site
+  prober:
+    url: blackbox-exporter.codepoets.svc:9115
+  targets:
+    staticConfig:
+      static:
+        - https://codepoetssociety.info/
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: codepoets-origin
+  labels:
+    release: kube-prometheus-stack
+spec:
+  interval: 60s
+  module: origin
+  prober:
+    url: blackbox-exporter.codepoets.svc:9115
+  targets:
+    staticConfig:
+      static:
+        - http://code-poets-society.codepoets.svc/
+---
+# Every 2 minutes (~720 requests/day, trivial for Supabase; also counts as
+# activity). Must stay well under Prometheus's 5m lookback window: at exactly
+# 5m the latest sample briefly drops out of range on every cycle, which
+# resets a pending alert's `for` timer so CodePoetsSupabaseDown never fires.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: codepoets-supabase
+  labels:
+    release: kube-prometheus-stack
+spec:
+  interval: 2m
+  scrapeTimeout: 15s
+  module: supabase_rest
+  prober:
+    url: blackbox-exporter.codepoets.svc:9115
+  targets:
+    staticConfig:
+      static:
+        - https://lzczpyfutpyqodfwwenp.supabase.co/rest/v1/projects?select=id&limit=1

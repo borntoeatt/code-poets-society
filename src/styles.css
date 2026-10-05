@@ -1024,3 +1024,63 @@ main:focus {
 .page-heading:focus {
     outline: none;
 }
+
+/* Projects page source tabs (Community / From GitHub) */
+.tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 3px solid var(--ink);
+    margin-bottom: 1.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* The selected underline is drawn inside the tab (inset shadow) rather than
+   overlapping the row's border, so the row never overflows vertically. */
+.tab {
+    background: none;
+    border: none;
+    padding: 0.7rem 1.2rem;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.tab:hover {
+    color: var(--ink);
+}
+
+.tab[aria-selected="true"] {
+    color: var(--ink);
+    box-shadow: inset 0 -4px 0 var(--code-green);
+}
+
+.tab:focus-visible {
+    outline: 3px solid var(--code-green);
+    outline-offset: -3px;
+}
+
+@media (max-width: 480px) {
+    .tab {
+        padding: 0.6rem 0.8rem;
+    }
+}
+
+.tab-count {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0 0.45rem;
+    font-size: 0.75rem;
+    border: 2px solid currentColor;
+    border-radius: 999px;
+    line-height: 1.4;
+}
+
+.tab-intro {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
+}

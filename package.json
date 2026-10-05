@@ -13,17 +13,17 @@
     "check:edge": "cd supabase/functions/verify-turnstile && npx -y deno@2.1.4 check --frozen index.ts && npx -y deno@2.1.4 lint"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.0",
+    "@supabase/supabase-js": "^2.117.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-react": "^6.1.1",
-    "eslint": "^9.0.0",
+    "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "globals": "^15.0.0",
+    "globals": "^17.12.0",
     "vite": "^8.3.1",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.3"
   }
 }
