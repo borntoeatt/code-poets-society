@@ -194,6 +194,20 @@ If CI is broken and you need to pin a digest by hand:
 docker buildx imagetools inspect dporkov/code-poets-society:latest
 ```
 
+## Network policy
+
+`k8s/networkpolicy.yaml` limits what the two workloads can reach and who can
+reach them (enforced by k3s' built-in policy controller):
+
+- Website pods: in from Traefik and the blackbox exporter; no egress at all
+  (nginx only serves files; Supabase and Turnstile are called by the browser).
+- Blackbox exporter: in from Prometheus (namespace `monitoring`); out to
+  cluster DNS, the website pods and public HTTPS.
+
+A new Probe target on a private address or a port other than 443 needs a rule
+there, or the probe fails. Rollback: revert the commit (Argo prunes the
+policies).
+
 ## Monitoring and alerts
 
 Synced by Argo from `k8s/` along with the app (namespace `codepoets`):
