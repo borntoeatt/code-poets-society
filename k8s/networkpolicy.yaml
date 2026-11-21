@@ -1,0 +1,108 @@
+# The site is public (Cloudflare -> Nginx Proxy Manager -> Traefik -> the
+# website pods), so a bug in it must not reach the rest of the cluster or the
+# LAN. Two policies, one per workload in this namespace. Enforced by k3s'
+# built-in policy controller (kube-router); kubelet probes come from the pod's
+# own node and are not affected.
+#
+# Website (nginx serving static files). In: Traefik, and the blackbox exporter
+# for the "origin" check. Out: nothing; nginx opens no connections of its own
+# (nginx.conf has no proxy_pass and no resolver), and Supabase and Turnstile
+# are called by the visitor's browser. If the container ever starts calling
+# something, add the rule here in the same PR.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: code-poets-society
+spec:
+  podSelector:
+    matchLabels:
+      app: code-poets-society
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    # Traefik, for codepoetssociety.info (ingress.yaml).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 80
+    # The codepoets-origin Probe (monitoring-probes.yaml).
+    - from:
+        - podSelector:
+            matchLabels:
+              app: blackbox-exporter
+      ports:
+        - protocol: TCP
+          port: 80
+  # No rule: all egress is denied.
+  egress: []
+---
+# Blackbox exporter (monitoring-blackbox.yaml). In: Prometheus, which runs
+# the three Probes through it. Out: cluster DNS, the website pods (origin
+# check) and public HTTPS (the site through Cloudflare, Supabase REST).
+# The exporter probes whatever URL its caller names, so its egress is kept as
+# narrow as the three Probes: without these rules it could be pointed at any
+# in-cluster or LAN service. A new Probe target on a private address or
+# another port needs a rule here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: blackbox-exporter
+spec:
+  podSelector:
+    matchLabels:
+      app: blackbox-exporter
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    # Prometheus of kube-prometheus-stack (namespace monitoring).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9115
+  egress:
+    # Cluster DNS.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # codepoets-origin: the website pods, through their Service.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: code-poets-society
+      ports:
+        - protocol: TCP
+          port: 80
+    # codepoets-site (Cloudflare) and codepoets-supabase: public addresses
+    # over HTTPS. Nothing on private or link-local addresses: not the LAN,
+    # not the nodes, not other pods.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
